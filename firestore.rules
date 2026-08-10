@@ -1,0 +1,13 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Starter rule: any signed-in user (e.g. via Firebase Auth) can read/write
+    // every category collection (Necklace, Bracelet, ...). Tighten this to
+    // your staff's auth UIDs / custom claims before going to production -
+    // e.g. require request.auth.token.role == "staff".
+    match /{category}/{docId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

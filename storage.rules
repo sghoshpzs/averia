@@ -1,0 +1,14 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /invoices/{invoiceId} {
+      // PDFs are written only by the Cloud Function (Admin SDK bypasses
+      // these rules); allow public read via the download URL that gets
+      // shared over WhatsApp. Lock this down further if invoices are
+      // sensitive - e.g. signed URLs with expiry instead of public read.
+      allow read: if true;
+      allow write: if false;
+    }
+  }
+}

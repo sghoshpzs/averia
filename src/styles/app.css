@@ -1,0 +1,268 @@
+/* ==========================================================================
+   Design tokens
+   ========================================================================== */
+:root {
+  --bg: #141310;
+  --surface: #1e1b16;
+  --surface-2: #262219;
+  --border: rgba(201, 162, 75, 0.18);
+  --gold: #c9a24b;
+  --gold-soft: #e4c77a;
+  --ivory: #f3efe7;
+  --muted: #a79c89;
+  --success: #6fa98c;
+  --success-bg: rgba(111, 169, 140, 0.12);
+  --error: #c96a54;
+  --error-bg: rgba(201, 106, 84, 0.12);
+  --radius: 6px;
+  --font-display: "Cormorant Garamond", serif;
+  --font-body: "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+* { box-sizing: border-box; }
+
+html, body, #root { height: 100%; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ivory);
+  font-family: var(--font-body);
+  -webkit-font-smoothing: antialiased;
+}
+
+.app-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ==========================================================================
+   Navbar - signature gold hairline + diamond glyph divider
+   ========================================================================== */
+.navbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 18px 32px;
+  border-bottom: 1px solid var(--border);
+  background: linear-gradient(180deg, var(--surface), var(--bg));
+  position: relative;
+}
+
+.navbar::after {
+  content: "◆";
+  position: absolute;
+  left: 50%;
+  bottom: -9px;
+  transform: translateX(-50%);
+  font-size: 12px;
+  color: var(--gold);
+  background: var(--bg);
+  padding: 0 8px;
+}
+
+.logo-wrap { display: flex; align-items: center; gap: 12px; }
+.logo-img { object-fit: contain; border-radius: 4px; }
+.logo-fallback {
+  display: flex; align-items: center; justify-content: center;
+  border: 1px solid var(--gold);
+  color: var(--gold-soft);
+  font-family: var(--font-display);
+  font-weight: 600;
+  border-radius: 50%;
+  letter-spacing: 1px;
+}
+.logo-title {
+  font-family: var(--font-display);
+  font-size: 22px;
+  font-weight: 600;
+  color: var(--gold-soft);
+  letter-spacing: 0.5px;
+}
+
+.nav-links { display: flex; gap: 28px; }
+.nav-links a {
+  color: var(--muted);
+  text-decoration: none;
+  font-size: 14px;
+  letter-spacing: 0.4px;
+  text-transform: uppercase;
+  padding-bottom: 4px;
+  border-bottom: 1px solid transparent;
+  transition: color 0.15s ease, border-color 0.15s ease;
+}
+.nav-links a:hover { color: var(--ivory); }
+.nav-links a.active { color: var(--gold-soft); border-color: var(--gold); }
+
+/* ==========================================================================
+   Layout
+   ========================================================================== */
+.app-main {
+  flex: 1;
+  max-width: 920px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 40px 24px 80px;
+}
+
+.page-header { margin-bottom: 24px; }
+.page-header h1 {
+  font-family: var(--font-display);
+  font-size: 34px;
+  font-weight: 600;
+  color: var(--ivory);
+  margin: 0 0 6px;
+}
+.subtitle { color: var(--muted); font-size: 14px; margin: 0; }
+
+.card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 24px;
+  margin-bottom: 20px;
+}
+
+.card h3 {
+  font-family: var(--font-display);
+  font-size: 20px;
+  color: var(--gold-soft);
+  margin: 0 0 14px;
+}
+
+/* ==========================================================================
+   Forms
+   ========================================================================== */
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 18px 20px;
+}
+
+@media (max-width: 640px) {
+  .form-grid { grid-template-columns: 1fr; }
+}
+
+.field { display: flex; flex-direction: column; gap: 6px; }
+.field label {
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+}
+.required { color: var(--error); margin-left: 3px; }
+
+input, select {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  color: var(--ivory);
+  border-radius: var(--radius);
+  padding: 10px 12px;
+  font-size: 14px;
+  font-family: var(--font-body);
+  outline: none;
+  transition: border-color 0.15s ease;
+}
+input:focus, select:focus { border-color: var(--gold); }
+input:disabled, select:disabled { opacity: 0.7; }
+
+.input-prefix-wrap { display: flex; align-items: center; position: relative; }
+.input-prefix-wrap.has-prefix input { padding-left: 26px; }
+.input-prefix {
+  position: absolute; left: 12px; color: var(--muted); font-size: 14px; pointer-events: none;
+}
+.readonly input { background: var(--surface); color: var(--gold-soft); font-weight: 600; }
+
+.barcode-row { display: flex; gap: 8px; }
+.barcode-row input { flex: 1; }
+
+.help-text { color: var(--muted); font-size: 11.5px; }
+
+.form-actions {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 12px;
+  margin-top: 4px;
+}
+.span-all { grid-column: 1 / -1; }
+
+.btn-primary, .btn-secondary, .btn-icon {
+  font-family: var(--font-body);
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--radius);
+  cursor: pointer;
+  transition: transform 0.1s ease, opacity 0.15s ease;
+}
+.btn-primary {
+  background: var(--gold);
+  color: #1a1712;
+  border: none;
+  padding: 11px 22px;
+}
+.btn-primary:hover { background: var(--gold-soft); }
+.btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.btn-secondary {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  padding: 11px 22px;
+}
+.btn-secondary:hover { color: var(--ivory); border-color: var(--gold); }
+
+.btn-icon {
+  background: var(--surface-2);
+  color: var(--ivory);
+  border: 1px solid var(--border);
+  padding: 8px 10px;
+}
+.btn-icon:hover { border-color: var(--gold); }
+
+/* ==========================================================================
+   Alerts
+   ========================================================================== */
+.alert {
+  padding: 12px 14px;
+  border-radius: var(--radius);
+  font-size: 13.5px;
+  margin-top: 12px;
+}
+.alert-success { background: var(--success-bg); color: var(--success); border: 1px solid var(--success); }
+.alert-error { background: var(--error-bg); color: var(--error); border: 1px solid var(--error); }
+
+/* ==========================================================================
+   Table
+   ========================================================================== */
+.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+.data-table th {
+  text-align: left;
+  color: var(--muted);
+  text-transform: uppercase;
+  font-size: 11px;
+  letter-spacing: 0.5px;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+}
+.data-table td { padding: 10px; border-bottom: 1px solid var(--border); }
+
+/* ==========================================================================
+   Barcode scanner modal
+   ========================================================================== */
+.modal-overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.6);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 50;
+}
+.modal-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  width: min(420px, 90vw);
+}
+.modal-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px; }
+.modal-header h3 { margin: 0; font-family: var(--font-display); color: var(--gold-soft); }
+.scanner-region { width: 100%; min-height: 260px; background: #000; border-radius: var(--radius); overflow: hidden; }
