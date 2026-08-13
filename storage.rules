@@ -1,0 +1,10 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    match /invoices/{fileName} {
+      // Reads happen via signed URLs generated server-side (Cloud Functions),
+      // so client reads/writes are locked to signed-in users only.
+      allow read, write: if request.auth != null;
+    }
+  }
+}

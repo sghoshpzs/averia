@@ -1,0 +1,12 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // This scaffold does not ship a login screen. These rules require any
+    // signed-in Firebase Auth user (see README "Adding a login screen").
+    // For local testing ONLY you can temporarily relax this to `allow read,
+    // write: if true;` — never deploy that to production.
+    match /{document=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
