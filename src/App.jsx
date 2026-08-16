@@ -1,6 +1,12 @@
 import { useEffect, useState } from 'react';
 import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { GoogleAuthProvider, onAuthStateChanged, signInWithPopup, signOut } from 'firebase/auth';
+import {
+  GoogleAuthProvider,
+  onAuthStateChanged,
+  signInWithRedirect,
+  getRedirectResult,
+  signOut
+} from 'firebase/auth';
 import { auth } from './firebase';
 import Layout from './components/Layout';
 import InventoryPage from './pages/InventoryPage';
@@ -40,7 +46,7 @@ function LoginScreen({ onGoogleLogin, loading, error }) {
         <div className="auth-brand">Averia Jewellers</div>
         {error && <p className="auth-error">{error}</p>}
         <button type="button" className="auth-button" onClick={onGoogleLogin} disabled={loading}>
-          {loading ? 'Signing in…' : 'Continue with Google'}
+          {loading ? 'Redirecting\u2026' : 'Continue with Google'}
         </button>
       </div>
     </div>
@@ -69,11 +75,21 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
 
+  // Picks up the result of a signInWithRedirect once the browser navigates
+  // back from Google. Runs once on mount, before/alongside onAuthStateChanged.
+  // This is also where redirect-specific errors surface (popup errors used to
+  // reject the signInWithPopup promise directly; redirect errors only show up
+  // here, after the round trip completes).
+  useEffect(() => {
+    getRedirectResult(auth).catch((err) => {
+      setLoginError(err.message || 'Google login failed. Please try again.');
+    });
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
       setAuthLoading(false);
-      setLoginError('');
     });
     return unsubscribe;
   }, []);
@@ -84,10 +100,12 @@ export default function App() {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithPopup(auth, provider);
+      // Navigates the whole page to Google's sign-in flow, then back to this
+      // app's URL. Nothing to await here for the "success" case — the app
+      // reloads and onAuthStateChanged/getRedirectResult pick it up above.
+      await signInWithRedirect(auth, provider);
     } catch (err) {
       setLoginError(err.message || 'Google login failed. Please try again.');
-    } finally {
       setLoginLoading(false);
     }
   }
@@ -97,7 +115,7 @@ export default function App() {
   }
 
   if (authLoading) {
-    return <div className="auth-shell"><div className="auth-card"><h1>Loading…</h1></div></div>;
+    return <div className="auth-shell"><div className="auth-card"><h1>Loading\u2026</h1></div></div>;
   }
 
   if (!user) {
