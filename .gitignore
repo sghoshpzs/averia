@@ -4,3 +4,5 @@ dist/
 .firebase/
 functions/node_modules/
 *.log
+.agents/
+!.agents/skills.json

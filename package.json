@@ -10,7 +10,7 @@
     "deploy": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
-    "firebase": "^10.14.1",
+    "firebase": "^12.17.1",
     "html5-qrcode": "^2.3.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
@@ -19,6 +19,10 @@
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.2",
-    "vite": "^5.4.8"
+    "vite": "^8.2.1"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true,
+    "protobufjs@7.6.5": true
   }
 }
