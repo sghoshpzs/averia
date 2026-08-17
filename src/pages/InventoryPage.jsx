@@ -102,7 +102,7 @@ export default function InventoryPage() {
 
         <div style={{ marginTop: 16 }}>
           <button type="submit" className="btn btn-primary" disabled={saving}>
-            {saving ? 'Saving\u2026' : 'Save to inventory'}
+            {saving ? 'Saving&mldr;' : 'Save to inventory'}
           </button>
         </div>
       </form>

@@ -52,12 +52,12 @@ export default function CustomersPage() {
         <div className="field-grid" style={{ gridTemplateColumns: '3fr auto' }}>
           <div className="field">
             <label>WhatsApp marketing message</label>
-            <input type="text" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="e.g. New AD collection just landed \u2014 20% off this week!" />
+            <input type="text" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="e.g. New AD collection just landed &mdash; 20% off this week!" />
           </div>
           <div className="field">
             <label>&nbsp;</label>
             <button type="button" className="btn btn-primary" disabled={sending || selectedIds.length === 0 || !message.trim()} onClick={sendMarketing}>
-              {sending ? 'Sending\u2026' : `Send to ${selectedIds.length || ''}`}
+              {sending ? 'Sending&#8230;' : `Send to ${selectedIds.length || ''}`}
             </button>
           </div>
         </div>
@@ -71,7 +71,7 @@ export default function CustomersPage() {
       </div>
 
       <div className="panel">
-        {customers.length === 0 && <p className="muted">No customers yet \u2014 they're created automatically from invoices.</p>}
+        {customers.length === 0 && <p className="muted">No customers yet &mdash; they're created automatically from invoices.</p>}
         {customers.map((c) => (
           <div key={c.id} className="customer-row">
             <div className="customer-summary" onClick={() => toggleExpand(c.id)}>
@@ -93,7 +93,7 @@ export default function CustomersPage() {
                 {(c.purchases || []).length === 0 && <p>No purchase history.</p>}
                 {(c.purchases || []).map((p, idx) => (
                   <div key={idx} style={{ marginBottom: 4 }}>
-                    {new Date(p.date).toLocaleDateString()} \u2014 {formatCurrency(p.amount)}
+                    {new Date(p.date).toLocaleDateString()} &mdash; {formatCurrency(p.amount)}
                     {p.invoiceRef ? <> \u00b7 <a href={`#/invoice/${p.invoiceRef}`}>Invoice link</a></> : null}
                   </div>
                 ))}

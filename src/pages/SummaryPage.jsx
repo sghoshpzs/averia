@@ -209,7 +209,7 @@ export default function SummaryPage() {
       </div>
 
       <div className="panel">
-        <h2>% Profit by Type {categoryFilter !== 'All' ? `\u2014 ${categoryFilter}` : ''}</h2>
+        <h2>% Profit by Type {categoryFilter !== 'All' ? `&mdash; ${categoryFilter}` : ''}</h2>
         {categoryFilter === 'All' ? (
           <p className="muted">Select a category above to see the breakdown by type.</p>
         ) : (
@@ -246,7 +246,7 @@ export default function SummaryPage() {
                     ) : (
                       <input
                         className="filter-input"
-                        placeholder={col.filter === 'number' ? 'e.g. gt:100' : 'filter\u2026'}
+                        placeholder={col.filter === 'number' ? 'e.g. gt:100' : 'filter&mldr;'}
                         value={columnFilters[col.key] || ''}
                         onChange={(e) => setColFilter(col.key, e.target.value)}
                       />
@@ -284,7 +284,7 @@ export default function SummaryPage() {
                         </td>
                       );
                     }
-                    return <td key={col.key}>{typeof val === 'number' ? val.toLocaleString('en-IN') : (val ?? '\u2014')}</td>;
+                    return <td key={col.key}>{typeof val === 'number' ? val.toLocaleString('en-IN') : (val ?? '&mdash;')}</td>;
                   })}
                 </tr>
               ))}
