@@ -1,5 +1,5 @@
 // ============================================================================
-// SHOP CONFIG — everything a shop owner needs to customize lives here.
+// SHOP CONFIG \u2014 everything a shop owner needs to customize lives here.
 // No other file should need to change when you add a category, vendor,
 // dropdown option, or swap the logo.
 // ============================================================================
@@ -24,7 +24,7 @@ const shopConfig = {
   // ---- Categories -----------------------------------------------------
   // These are shown as options in the "Category" dropdown on Inventory,
   // Invoice, and the Summary filter. Every item is stored in a single
-  // Firestore collection ("inventory") with a `category` field — this
+  // Firestore collection ("inventory") with a `category` field \u2014 this
   // array just drives the dropdown, it does not create new collections.
   categories: ['Necklace', 'Bracelet', 'Ring', 'Earring', 'Bangle', 'Anklet'],
 

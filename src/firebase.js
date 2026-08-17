@@ -4,7 +4,7 @@ import { getStorage } from 'firebase/storage';
 import { getFunctions } from 'firebase/functions';
 import { getAuth } from 'firebase/auth';
 
-// All values are read from Vite env vars — see .env.example.
+// All values are read from Vite env vars \u2014 see .env.example.
 // Never hardcode these; Vite inlines them at build time.
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,

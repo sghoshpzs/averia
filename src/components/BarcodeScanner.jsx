@@ -45,13 +45,13 @@ export default function BarcodeScanner({ onDetected }) {
   }
 
   if (!active) {
-    return <button type="button" className="btn btn-secondary" onClick={() => setActive(true)}>📷 Scan barcode</button>;
+    return <button type="button" className="btn btn-secondary" onClick={() => setActive(true)}>Scan barcode</button>;
   }
 
   return (
     <div className="scanner-box">
       <div id={elementId.current} style={{ width: '100%', maxWidth: 320 }} />
-      {error && <p className="muted" style={{ color: '#b3372c' }}>{error} — enter the barcode number manually instead.</p>}
+      {error && <p className="muted" style={{ color: '#b3372c' }}>{error} \u2014 enter the barcode number manually instead.</p>}
       <button type="button" className="btn btn-secondary" style={{ marginTop: 8 }} onClick={stop}>Cancel</button>
     </div>
   );
