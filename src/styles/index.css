@@ -241,10 +241,12 @@ table.data-table.excel-table tbody tr:hover td {
 }
 .access-card { max-width: 520px; }
 .header-actions { display: flex; align-items: center; gap: 12px; }
-.user-email { font-size: 12px; color: var(--ink-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.user-block { display: flex; flex-direction: column; gap: 6px; align-items: flex-end; min-width: 0; }
+.user-name { font-size: 12px; color: var(--ink-muted); max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-align: right; }
 .logout-button {
   border: 1px solid var(--hairline); background: var(--surface); color: var(--ink); border-radius: 999px; padding: 8px 12px; font-weight: 600; cursor: pointer;
 }
+
 
 .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
 .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
@@ -270,10 +272,13 @@ table.data-table.excel-table tbody tr:hover td {
   .menu-toggle { display: flex; }
   .app-nav-mobile { display: flex; }
   .app-main { padding: 16px; }
-  .app-header-row { padding: 14px 16px; }
+  .app-header-row { padding: 14px 16px; flex-wrap: wrap; }
   .brand img.logo { height: 40px; }
   .brand .shop-name { font-size: 44px; }
   .line-item-row { grid-template-columns: 1fr 1fr; }
+  /* keep user block items left-aligned on smaller screens to avoid overflow */
+  .user-block { align-items: flex-start; }
+  .user-name { text-align: left; }
 }
 
 @media (max-width: 560px) {

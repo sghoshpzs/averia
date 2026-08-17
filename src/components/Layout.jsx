@@ -38,10 +38,16 @@ export default function Layout({ role, user }) {
           </nav>
 
           <div className="header-actions">
-            {user?.email && <span className="user-email">{user.email}</span>}
-            <button type="button" className="logout-button" onClick={() => signOut(auth)}>
-              Sign out
-            </button>
+            <div className="user-block">
+              {user?.displayName ? (
+                <span className="user-name">{user.displayName}</span>
+              ) : (
+                user?.email && <span className="user-name">{user.email}</span>
+              )}
+              <button type="button" className="logout-button" onClick={() => signOut(auth)}>
+                Sign out
+              </button>
+            </div>
             <button
               type="button"
               className="menu-toggle"
