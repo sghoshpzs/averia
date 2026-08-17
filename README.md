@@ -1,165 +1,143 @@
 # Jewellery Shop Manager
 
-React + Firebase app for running a jewellery shop: configurable inventory intake,
-barcode invoicing, a sales/profit dashboard, and WhatsApp-driven customer
-marketing. Deploys to Firebase Hosting; data lives in Firestore; PDFs are
-generated and WhatsApp messages sent from Cloud Functions via Twilio.
+A lightweight single-page React application for managing a small jewellery shop: inventory intake, barcode-driven invoicing, customer management, sales summary, and WhatsApp-based communication. The app uses Firebase for authentication, storage, Firestore database and Cloud Functions to generate PDFs and send WhatsApp messages via Twilio.
 
-## 1. What's in here
+---
 
-```
-src/
-  config/shopConfig.js      <- EDIT THIS FIRST: categories, types, vendors,
-                                fields, defaults, logo path, currency
-  firebase.js                Firebase SDK init (reads .env)
-  components/                Layout/nav, dynamic form field, barcode scanner
-  pages/
-    InventoryPage.jsx        stock intake form (bulk entry supported)
-    InvoicePage.jsx          barcode lookup, cart, checkout
-    SummaryPage.jsx          filters, KPIs, charts, editable/filterable table
-    CustomersPage.jsx        expand/collapse customer list + WhatsApp blast
-  utils/                     calculations, Firestore helpers, date ranges
-functions/
-  index.js                   Cloud Functions: PDF + Twilio WhatsApp send
-  templates/invoiceTemplate.js   <- EDIT THIS to restyle the invoice PDF
-firestore.rules, storage.rules, firebase.json
-```
+## Table of contents
 
-## 2. One-time setup
+- [Features](#features)
+- [Tech stack](#tech-stack)
+- [Prerequisites](#prerequisites)
+- [Quick start](#quick-start)
+- [Firebase setup](#firebase-setup)
+- [Twilio / WhatsApp setup](#twilio--whatsapp-setup)
+- [Configuration](#configuration)
+- [Development & build](#development--build)
+- [Deploy](#deploy)
+- [Customizing invoice PDF](#customizing-invoice-pdf)
+- [Contributing](#contributing)
+- [License](#license)
 
-### Firebase project
-1. Create a project at console.firebase.google.com.
-2. Enable **Firestore** (production mode), **Storage**, and **Hosting**.
-3. Enable the **Blaze (pay-as-you-go) plan** — required for Cloud Functions
-   to call external APIs like Twilio. Cost for this workload is typically a
-   few dollars/month at small shop volume.
-4. Project Settings > General > Add app > Web app. Copy the config values
-   into a `.env` file (copy `.env.example` first).
-5. Install the CLI and log in: `npm install -g firebase-tools && firebase login`
-6. `firebase use --add` and select your project.
+---
 
-### Install dependencies
-```bash
-npm install
-cd functions && npm install && cd ..
-```
+## Features
 
-### Twilio (WhatsApp)
-1. Sign up at twilio.com, grab your **Account SID** and **Auth Token**.
-2. For testing, use the free **WhatsApp Sandbox** (Console > Messaging > Try it
-   out > Send a WhatsApp message). It gives you a `whatsapp:+14155238886`-style
-   from-number. Each customer must send the sandbox's join code once before
-   they can receive messages — fine for testing, not for real customers.
-3. For production, apply for **WhatsApp Business** access in Twilio (needs a
-   Meta Business verification) and get a real WhatsApp-enabled number.
-4. Set the secrets Cloud Functions will use:
-   ```bash
+- Role-based access (admin / worker).
+- Inventory CRUD with configurable categories, types and vendors.
+- Barcode/QR scanning for fast invoice line-item lookup (html5-qrcode).
+- Create invoices, apply discounts and generate/send PDFs via Cloud Functions.
+- Customers list with WhatsApp messaging integration (Twilio).
+- Responsive layout and simple admin UI for shop configuration.
+
+## Tech stack
+
+- React + JSX
+- Vite (build tooling)
+- Firebase: Authentication, Firestore, Storage, Cloud Functions
+- Twilio (WhatsApp) used from Cloud Functions
+- html5-qrcode (client barcode scanner)
+
+## Prerequisites
+
+- Node.js 18+ and npm
+- A Firebase project with Billing enabled (Blaze) for external API calls
+- Twilio account for WhatsApp (sandbox for testing)
+
+## Quick start
+
+1. Copy the example env and fill in Firebase config:
+
+   cp .env.example .env
+   # edit .env and add Firebase SDK config and allowed admin/worker emails
+
+2. Install dependencies:
+
+   npm install
+   cd functions && npm install && cd ..
+
+3. Run dev server:
+
+   npm run dev
+
+4. To run Cloud Functions locally (optional):
+
+   firebase emulators:start --only functions,firestore,storage
+
+## Firebase setup
+
+1. Create a Firebase project and enable Firestore, Storage and Hosting.
+2. Enable Billing (Blaze) if you plan to use Twilio or other external APIs.
+3. From Project Settings → General → Add web app, copy the Firebase config into `.env` (use `.env.example` as a template).
+4. Authenticate the Firebase CLI and select the project:
+
+   npm install -g firebase-tools
+   firebase login
+   firebase use --add
+
+5. (Optional) Set Cloud Functions secrets for Twilio:
+
    firebase functions:secrets:set TWILIO_ACCOUNT_SID
    firebase functions:secrets:set TWILIO_AUTH_TOKEN
-   firebase functions:secrets:set TWILIO_WHATSAPP_FROM   # e.g. whatsapp:+14155238886
-   ```
-5. **Important — 24 hour session rule:** WhatsApp only allows free-form
-   messages within 24 hours of the customer last messaging you. The invoice
-   send (right after a sale) is usually fine. For the marketing blast
-   (`sendWhatsappMarketing`), you'll likely need a **pre-approved message
-   template** instead of free text once you're out of the sandbox. Register
-   one in the Twilio Console (Content Editor), then swap the `body:` field
-   for `contentSid` / `contentVariables` — there's a commented example
-   already in `functions/index.js`.
+   firebase functions:secrets:set TWILIO_WHATSAPP_FROM
 
-## 3. Run locally
-```bash
-npm run dev
-```
-Cloud Functions won't run locally unless you also start the emulator:
-```bash
-firebase emulators:start --only functions,firestore,storage
-```
+## Twilio / WhatsApp setup
 
-## 4. Deploy
-```bash
-npm run build
-firebase deploy --only hosting,functions,firestore:rules,storage:rules
-```
+- For local testing you can use Twilio's WhatsApp sandbox (Console → Messaging → Try it out). For production you must provision a WhatsApp-enabled number and register templates for marketing messages.
+- The app's Cloud Function expects Twilio credentials as secrets (see above).
+- Note: WhatsApp free-form messages are permitted only within 24 hours of a user's last message; marketing blasts require approved templates.
 
-## 5. Configuring the shop (no code changes needed for most of this)
+## Configuration
 
-Everything in `src/config/shopConfig.js`:
+Primary configuration lives in `src/config/shopConfig.js`:
 
-- **`shopName` / `logoPath`** — logo can be a file in `/public` (e.g.
-  `/logo.png`) or a full URL. A placeholder ships at `/logo.svg`.
-- **`categories`** — the Category dropdown across all pages. All inventory
-  is stored in a single Firestore collection with a `category` field (not
-  one collection per category), so adding a category here is enough.
-- **`types`** — a map of `category -> [type options]`. Add a `_default` key
-  for categories you haven't listed.
-- **`vendors`**, **`paymentModes`**, **`statuses`** — flat option lists.
-- **`defaults`** — starting values for % Profit, Box Price, # Items.
-- **`inventoryFields` / `invoiceFields`** — the form field lists that drive
-  the Inventory and Invoice pages. Reordering or relabeling here reorders/
-  relabels the actual form. Field `type` can be `category`, `dropdown`,
-  `text`, `number`, or `readonly`.
-- **`inventoryListColumns`** — columns (and which are filterable/editable)
-  on the Summary page's detail table.
+- shopName, logoPath, currencySymbol
+- categories, types (per-category type lists), vendors
+- paymentModes, defaults (profit percent, box price, default item count)
+- inventoryFields / invoiceFields — drive which form fields are shown and their behavior
 
-## 6. Business logic reference
+To change allowed admin/worker users, set the environment variables in `.env`:
 
-- **Printed Price** = Cost + Cost × (%Profit / 100) + Box Price
-- **Final Price** (invoice) = Printed Price − Printed Price × (%Discount / 100)
-- **Row ID** = last 8 digits of the save timestamp (ms epoch) — doubles as
-  the barcode value. Bulk entry (`# items` > 1) writes that many rows in one
-  Firestore batch, each with its own Row ID/SKU.
-- **Status** flows: `Purchased` (created) → `Printed` (after the CSV export
-  on the Summary page) → `Sold` (after an invoice checkout). Editing name,
-  Box Price, or % Profit on the Summary table resets status to `Purchased`
-  and recalculates Printed Price.
-- **Barcode scan on Invoice** looks up the Row ID directly. If not found,
-  Printed Price becomes editable so you can still complete the sale.
+- VITE_ALLOWED_ADMINS (comma separated emails)
+- VITE_ALLOWED_WORKERS (comma separated emails)
 
-## 7. Customizing the invoice PDF
+## Development & build
 
-Edit **`functions/templates/invoiceTemplate.js`** only — it's isolated from
-the Cloud Function logic on purpose. It gets a live [pdfkit](https://pdfkit.org/docs/getting_started.html)
-`doc` object and the invoice data; draw whatever layout you want (add a logo
-image with `doc.image(...)`, change fonts/colors, add GST/tax lines, etc.).
-Redeploy functions after editing: `firebase deploy --only functions`.
+- Start dev server:
 
-## 8. Suggested next addition: a WhatsApp template setup page
+  npm run dev
 
-Right now the marketing message box on the Customers page sends free text,
-which only works within Twilio's 24-hour session window or in the sandbox.
-For real production marketing blasts, WhatsApp requires **pre-approved
-templates** (fixed text with `{{1}}`, `{{2}}` placeholders, approved by
-Meta, 24–48hr review). I'd recommend a small **Templates** admin view where
-you:
-1. Store your approved Twilio Content SIDs + variable names in a
-   `templates` Firestore collection (name, contentSid, variables[]).
-2. On the Customers page, pick a template from a dropdown instead of typing
-   free text, and fill in the variables.
-3. `sendWhatsappMarketing` in `functions/index.js` already has the
-   `contentSid` / `contentVariables` call commented in — wiring the above UI
-   to it is a small change once you've registered templates in Twilio.
+- Build for production:
 
-I didn't build this into v1 since it depends on templates you haven't
-registered with Twilio yet — happy to build it once you have SIDs.
+  npm run build
 
-## 9. Adding authentication (do this before real use)
+## Deploy
 
-This scaffold ships **no login screen**, and `firestore.rules` /
-`storage.rules` require `request.auth != null` — so as-is, nobody can read
-or write until you add sign-in. Easiest path: enable **Email/Password** (or
-Google) under Firebase Console > Authentication, then wrap `<App />` with a
-simple sign-in gate using `firebase/auth`'s `onAuthStateChanged` /
-`signInWithEmailAndPassword`. Ask me if you'd like this wired in — it's a
-focused addition (one new page + a few lines in `main.jsx`).
+1. Build assets: `npm run build`
+2. Deploy hosting, functions and security rules:
 
-## 10. Known gaps / things to decide as you go
+   firebase deploy --only hosting,functions,firestore:rules,storage:rules
 
-- Barcode scanning uses the device camera via `html5-qrcode`; it reads
-  standard 1D/2D barcodes and QR codes. If your printed labels use a format
-  it doesn't support, let me know the format and I'll swap the library.
-- The "Number of items" summary stat counts inventory rows in the filtered
-  range, not sold units — adjust `SummaryPage.jsx` if you want a different
-  definition.
-- No pagination on the Summary table yet — fine for hundreds of rows, worth
-  adding (Firestore cursor pagination) once inventory grows large.
+## Customizing invoice PDF
+
+Edit `functions/templates/invoiceTemplate.js`. The template receives a `pdfkit` `doc` instance and invoice data. Make layout and styling changes there and redeploy functions.
+
+## Contributing
+
+- Please open issues for bugs or feature requests.
+- Create topic branches for changes and open pull requests to `main`.
+- Keep commits focused and add a short description for reviews.
+
+## License
+
+MIT — see LICENSE file.
+
+---
+
+If you want, I can also:
+
+- Add usage examples/screenshots to the README.
+- Add a `Makefile` / npm scripts for common tasks (emulator start, deploy shorthand).
+- Insert CI workflows for build and linting.
+
+
