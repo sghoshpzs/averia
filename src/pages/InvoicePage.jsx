@@ -140,7 +140,7 @@ export default function InvoicePage() {
         });
         pdfUrl = res?.data?.pdfUrl || null;
       } catch (fnErr) {
-        // Invoice + inventory updates already succeeded — surface the PDF/WhatsApp
+        // Invoice + inventory updates already succeeded \u2014 surface the PDF/WhatsApp
         // failure separately so the sale itself isn't lost.
         setResult({
           type: 'warn',
@@ -207,7 +207,7 @@ export default function InvoicePage() {
             <input type="text" value={draft.barcode} onChange={(e) => lookupBarcode(e.target.value)} placeholder="Scan or type row ID" />
           </div>
           <div className="field">
-            <label>Printed Price {draft.lookupFailed && <span style={{ color: '#b3372c' }}>(not found — enter manually)</span>}</label>
+            <label>Printed Price {draft.lookupFailed && <span style={{ color: '#b3372c' }}>(not found \u2014 enter manually)</span>}</label>
             <input
               type="number"
               value={draft.printedPrice}

@@ -101,7 +101,7 @@ export default function App() {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       // Navigates the whole page to Google's sign-in flow, then back to this
-      // app's URL. Nothing to await here for the "success" case — the app
+      // app's URL. Nothing to await here for the "success" case \u2014 the app
       // reloads and onAuthStateChanged/getRedirectResult pick it up above.
       await signInWithRedirect(auth, provider);
     } catch (err) {
