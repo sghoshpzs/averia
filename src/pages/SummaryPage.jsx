@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import shopConfig from '../config/shopConfig';
-import { subscribeInventory, updateInventoryDoc, markPrinted } from '../utils/firestoreHelpers';
+import { subscribeInventory, subscribeSales, updateInventoryDoc, markPrinted } from '../utils/firestoreHelpers';
 import { calcPrintedPrice, calcProfit, formatCurrency } from '../utils/calculations';
 import { rangeFor, inRange } from '../utils/dateRanges';
 
@@ -9,59 +9,92 @@ const COLORS = ['#b8912f', '#8c1d2b', '#5c7a5f', '#8a6fae', '#3f6b8a', '#c98f3f'
 
 export default function SummaryPage() {
   const [rows, setRows] = useState([]);
+  const [sales, setSales] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [dateField, setDateField] = useState('created'); // 'created' | 'soldDate'
   const [period, setPeriod] = useState('fy'); // 'month' | 'quarter' | 'fy'
   const [chartView, setChartView] = useState('chart'); // 'chart' | 'table'
   const [columnFilters, setColumnFilters] = useState({});
+  const [expandedLots, setExpandedLots] = useState({});
 
   useEffect(() => subscribeInventory(setRows), []);
+  useEffect(() => subscribeSales(setSales), []);
 
   const range = useMemo(() => rangeFor(period), [period]);
 
-  const filteredByTopFilters = useMemo(() => {
-    return rows.filter((r) => {
-      if (categoryFilter !== 'All' && r.category !== categoryFilter) return false;
-      const millis = dateField === 'created' ? r.createdAtMillis : r.soldDateMillis;
-      return inRange(millis, range);
-    });
-  }, [rows, categoryFilter, dateField, range]);
+  const inventoryInScope = useMemo(
+    () => rows.filter((r) => categoryFilter === 'All' || r.category === categoryFilter),
+    [rows, categoryFilter]
+  );
+  const salesInScope = useMemo(
+    () => sales.filter((s) => categoryFilter === 'All' || s.category === categoryFilter),
+    [sales, categoryFilter]
+  );
+
+  // ---- Two ways to read "in range", depending on which date the toggle points at ----
+  // 'created'  -> filter inventory by purchase date, then only count sales
+  //               whose underlying inventory doc falls in that filtered set.
+  // 'soldDate' -> filter sales by sale date directly (this is what actually
+  //               answers "what sold in this period"), then only show
+  //               inventory rows that had at least one of those sales. Lot
+  //               docs can have sales spread across many periods, so a lot's
+  //               cost is never double counted here — see costOfGoodsSold.
+  const { filteredInventory, filteredSales } = useMemo(() => {
+    if (dateField === 'created') {
+      const invRows = inventoryInScope.filter((r) => inRange(r.createdAtMillis, range));
+      const invIds = new Set(invRows.map((r) => r.id));
+      return { filteredInventory: invRows, filteredSales: salesInScope.filter((s) => invIds.has(s.inventoryDocId)) };
+    }
+    const saleRows = salesInScope.filter((s) => inRange(s.soldDateMillis, range));
+    const soldInvIds = new Set(saleRows.map((s) => s.inventoryDocId));
+    return { filteredInventory: inventoryInScope.filter((r) => soldInvIds.has(r.id)), filteredSales: saleRows };
+  }, [inventoryInScope, salesInScope, dateField, range]);
 
   // ---- Summary stats ----
-  const totalInvested = filteredByTopFilters.reduce((s, r) => s + (Number(r.cost) || 0), 0);
-  const totalProfit = filteredByTopFilters
-    .filter((r) => r.status === 'Sold')
-    .reduce((s, r) => s + calcProfit(r.soldPrice, r.cost), 0);
-  const totalItems = filteredByTopFilters.length;
+  // "Total Invested" only really means "cost of stock purchased in this
+  // period" when dateField is 'created'. In 'soldDate' mode we show cost of
+  // goods actually sold in the period instead (summed straight from each
+  // sale's cost snapshot, so a lot's cost is per-unit, not double-counted).
+  const totalInvested = dateField === 'created'
+    ? filteredInventory.reduce((s, r) => s + (Number(r.cost) || 0) * (Number(r.quantityPurchased) || 1), 0)
+    : filteredSales.reduce((s, sale) => s + (Number(sale.cost) || 0), 0);
+  const investedLabel = dateField === 'created' ? 'Total Invested' : 'Cost of Goods Sold';
 
-  // ---- Profit % by category ----
+  const totalProfit = filteredSales.reduce((s, sale) => s + calcProfit(sale.soldPrice, sale.cost), 0);
+
+  const totalItems = dateField === 'created'
+    ? filteredInventory.reduce((s, r) => s + (Number(r.quantityPurchased) || 1), 0)
+    : filteredSales.length;
+  const itemsLabel = dateField === 'created' ? 'Units Purchased' : 'Units Sold';
+
+  // ---- Profit % by category (always computed from actual sale events) ----
   const profitByCategory = useMemo(() => {
     const byCat = {};
-    filteredByTopFilters.forEach((r) => {
-      if (!byCat[r.category]) byCat[r.category] = { cost: 0, profit: 0 };
-      byCat[r.category].cost += Number(r.cost) || 0;
-      if (r.status === 'Sold') byCat[r.category].profit += calcProfit(r.soldPrice, r.cost);
+    filteredSales.forEach((s) => {
+      if (!byCat[s.category]) byCat[s.category] = { cost: 0, profit: 0 };
+      byCat[s.category].cost += Number(s.cost) || 0;
+      byCat[s.category].profit += calcProfit(s.soldPrice, s.cost);
     });
     return Object.entries(byCat).map(([category, v]) => ({
       category,
       profitPercent: v.cost ? Number(((v.profit / v.cost) * 100).toFixed(1)) : 0
     }));
-  }, [filteredByTopFilters]);
+  }, [filteredSales]);
 
   // ---- Profit % by type, within the selected category ----
   const profitByType = useMemo(() => {
     if (categoryFilter === 'All') return [];
     const byType = {};
-    filteredByTopFilters.forEach((r) => {
-      if (!byType[r.type]) byType[r.type] = { cost: 0, profit: 0 };
-      byType[r.type].cost += Number(r.cost) || 0;
-      if (r.status === 'Sold') byType[r.type].profit += calcProfit(r.soldPrice, r.cost);
+    filteredSales.forEach((s) => {
+      if (!byType[s.type]) byType[s.type] = { cost: 0, profit: 0 };
+      byType[s.type].cost += Number(s.cost) || 0;
+      byType[s.type].profit += calcProfit(s.soldPrice, s.cost);
     });
     return Object.entries(byType).map(([type, v]) => ({
       type,
       profitPercent: v.cost ? Number(((v.profit / v.cost) * 100).toFixed(1)) : 0
     }));
-  }, [filteredByTopFilters, categoryFilter]);
+  }, [filteredSales, categoryFilter]);
 
   // ---- Detail list with per-column filters ----
   function setColFilter(key, value) {
@@ -80,7 +113,7 @@ export default function SummaryPage() {
   };
 
   const detailRows = useMemo(() => {
-    return filteredByTopFilters.filter((r) => {
+    return filteredInventory.filter((r) => {
       return shopConfig.inventoryListColumns.every((col) => {
         const raw = columnFilters[col.key];
         if (!raw) return true;
@@ -102,7 +135,23 @@ export default function SummaryPage() {
         return String(cellValue ?? '').toLowerCase().includes(raw.toLowerCase());
       });
     });
-  }, [filteredByTopFilters, columnFilters]);
+  }, [filteredInventory, columnFilters]);
+
+  // Sales belonging to a given lot, most recent first — used in the
+  // expandable row under each lot-tracked inventory row.
+  const salesByLot = useMemo(() => {
+    const map = {};
+    sales.forEach((s) => {
+      if (!s.inventoryDocId) return;
+      if (!map[s.inventoryDocId]) map[s.inventoryDocId] = [];
+      map[s.inventoryDocId].push(s);
+    });
+    return map;
+  }, [sales]);
+
+  function toggleLotExpand(id) {
+    setExpandedLots((prev) => ({ ...prev, [id]: !prev[id] }));
+  }
 
   async function handleCellEdit(row, colKey, newValue) {
     const patch = { [colKey]: colKey === 'name' ? newValue : Number(newValue) };
@@ -111,7 +160,12 @@ export default function SummaryPage() {
       const boxPrice = colKey === 'boxPrice' ? Number(newValue) : row.boxPrice;
       const profitPercent = colKey === 'profitPercent' ? Number(newValue) : row.profitPercent;
       patch.printedPrice = calcPrintedPrice(cost, profitPercent, boxPrice);
-      patch.status = 'Purchased';
+      if (!row.isLot || (Number(row.quantityRemaining) || 0) === (Number(row.quantityPurchased) || 1)) {
+        // Only reset a lot back to "Purchased" if nothing has sold from it
+        // yet — otherwise a lot that's half-sold would incorrectly look
+        // unsold again just because you tweaked its box price.
+        patch.status = 'Purchased';
+      }
     }
     await updateInventoryDoc(row.id, patch);
   }
@@ -168,7 +222,7 @@ export default function SummaryPage() {
       <div className="grid-3">
         <div className="panel summary-stat">
           <div className="value">{formatCurrency(totalInvested)}</div>
-          <div className="label">Total Invested</div>
+          <div className="label">{investedLabel}</div>
         </div>
         <div className="panel summary-stat">
           <div className="value">{formatCurrency(totalProfit)}</div>
@@ -176,7 +230,7 @@ export default function SummaryPage() {
         </div>
         <div className="panel summary-stat">
           <div className="value">{totalItems}</div>
-          <div className="label">Number of Items</div>
+          <div className="label">{itemsLabel}</div>
         </div>
       </div>
 
@@ -188,7 +242,9 @@ export default function SummaryPage() {
             <button type="button" className={chartView === 'table' ? 'active' : ''} onClick={() => setChartView('table')}>Table</button>
           </div>
         </div>
-        {chartView === 'chart' ? (
+        {profitByCategory.length === 0 ? (
+          <p className="muted">No sales recorded yet in this range.</p>
+        ) : chartView === 'chart' ? (
           <ResponsiveContainer width="100%" height={280}>
             <PieChart>
               <Pie data={profitByCategory} dataKey="profitPercent" nameKey="category" outerRadius={100} label>
@@ -209,9 +265,11 @@ export default function SummaryPage() {
       </div>
 
       <div className="panel">
-        <h2>% Profit by Type {categoryFilter !== 'All' ? `&mdash; ${categoryFilter}` : ''}</h2>
+        <h2>% Profit by Type {categoryFilter !== 'All' ? `— ${categoryFilter}` : ''}</h2>
         {categoryFilter === 'All' ? (
           <p className="muted">Select a category above to see the breakdown by type.</p>
+        ) : profitByType.length === 0 ? (
+          <p className="muted">No sales recorded yet in this range.</p>
         ) : (
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={profitByType}>
@@ -231,6 +289,9 @@ export default function SummaryPage() {
             Print (CSV) &amp; mark Printed
           </button>
         </div>
+        <p className="muted" style={{ marginTop: -8, marginBottom: 12 }}>
+          Rows with a gold "lot" badge share one barcode across multiple units — click the row to see each individual sale.
+        </p>
         <div className="summary-table-wrapper">
           <table className="data-table wide excel-table">
             <thead>
@@ -246,7 +307,7 @@ export default function SummaryPage() {
                     ) : (
                       <input
                         className="filter-input"
-                        placeholder={col.filter === 'number' ? 'e.g. gt:100' : 'filter&mldr;'}
+                        placeholder={col.filter === 'number' ? 'e.g. gt:100' : 'filter…'}
                         value={columnFilters[col.key] || ''}
                         onChange={(e) => setColFilter(col.key, e.target.value)}
                       />
@@ -256,38 +317,92 @@ export default function SummaryPage() {
               </tr>
             </thead>
             <tbody>
-              {detailRows.map((row) => (
-                <tr key={row.id}>
-                  {shopConfig.inventoryListColumns.map((col) => {
-                    const editable = col.editable;
-                    const val = row[col.key];
-                    if (col.key === 'status') {
-                      return (
-                        <td key={col.key}>
-                          <span className={`badge badge-${String(val).toLowerCase()}`}>{val}</span>
+              {detailRows.map((row) => {
+                const lotSales = row.isLot ? (salesByLot[row.id] || []) : [];
+                return (
+                  <Fragment key={row.id}>
+                    <tr
+                      onClick={row.isLot ? () => toggleLotExpand(row.id) : undefined}
+                      style={row.isLot ? { cursor: 'pointer' } : undefined}
+                    >
+                      {shopConfig.inventoryListColumns.map((col) => {
+                        const editable = col.editable;
+                        const val = row[col.key];
+
+                        if (col.key === 'rowId') {
+                          return (
+                            <td key={col.key}>
+                              {val}
+                              {row.isLot && <span className="badge badge-printed" style={{ marginLeft: 6 }}>lot × {row.quantityPurchased}</span>}
+                            </td>
+                          );
+                        }
+                        if (col.key === 'quantityPurchased' || col.key === 'quantityRemaining') {
+                          return <td key={col.key}>{row.isLot ? (val ?? 0) : (col.key === 'quantityPurchased' ? 1 : '—')}</td>;
+                        }
+                        if (col.key === 'soldPrice') {
+                          if (row.isLot) {
+                            const soldCount = (row.quantityPurchased || 0) - (row.quantityRemaining || 0);
+                            return <td key={col.key}>{soldCount > 0 ? `${soldCount} sold` : '—'}</td>;
+                          }
+                          return <td key={col.key}>{val ? formatCurrency(val) : '—'}</td>;
+                        }
+                        if (col.key === 'status') {
+                          return (
+                            <td key={col.key}>
+                              <span className={`badge badge-${String(val).toLowerCase()}`}>{val}</span>
+                            </td>
+                          );
+                        }
+                        if (col.filter === 'date') {
+                          if (col.key === 'soldDate') {
+                            if (row.isLot) return <td key={col.key}>see rows below</td>;
+                            return <td key={col.key}>{row.soldDateMillis ? new Date(row.soldDateMillis).toLocaleDateString() : '—'}</td>;
+                          }
+                          const millis = row.createdAtMillis;
+                          return <td key={col.key}>{millis ? new Date(millis).toLocaleDateString() : '—'}</td>;
+                        }
+                        if (editable) {
+                          return (
+                            <td key={col.key}>
+                              <input
+                                className="filter-input"
+                                style={{ marginTop: 0 }}
+                                defaultValue={val}
+                                onClick={(e) => e.stopPropagation()}
+                                onBlur={(e) => e.target.value !== String(val) && handleCellEdit(row, col.key, e.target.value)}
+                              />
+                            </td>
+                          );
+                        }
+                        return <td key={col.key}>{typeof val === 'number' ? val.toLocaleString('en-IN') : (val ?? '—')}</td>;
+                      })}
+                    </tr>
+                    {row.isLot && expandedLots[row.id] && (
+                      <tr key={`${row.id}-expand`}>
+                        <td colSpan={shopConfig.inventoryListColumns.length} style={{ background: 'var(--surface-sunken)' }}>
+                          {lotSales.length === 0 ? (
+                            <span className="muted">No units sold from this lot yet.</span>
+                          ) : (
+                            <table className="data-table" style={{ margin: '6px 0' }}>
+                              <thead><tr><th>Sold Date</th><th>Sold Price</th><th>Profit</th></tr></thead>
+                              <tbody>
+                                {lotSales.map((s) => (
+                                  <tr key={s.id}>
+                                    <td>{s.soldDateMillis ? new Date(s.soldDateMillis).toLocaleDateString() : '—'}</td>
+                                    <td>{formatCurrency(s.soldPrice)}</td>
+                                    <td>{formatCurrency(calcProfit(s.soldPrice, s.cost))}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          )}
                         </td>
-                      );
-                    }
-                    if (col.filter === 'date') {
-                      const millis = col.key === 'created' ? row.createdAtMillis : row.soldDateMillis;
-                      return <td key={col.key}>{millis ? new Date(millis).toLocaleDateString() : '\u2014'}</td>;
-                    }
-                    if (editable) {
-                      return (
-                        <td key={col.key}>
-                          <input
-                            className="filter-input"
-                            style={{ marginTop: 0 }}
-                            defaultValue={val}
-                            onBlur={(e) => e.target.value !== String(val) && handleCellEdit(row, col.key, e.target.value)}
-                          />
-                        </td>
-                      );
-                    }
-                    return <td key={col.key}>{typeof val === 'number' ? val.toLocaleString('en-IN') : (val ?? '&mdash;')}</td>;
-                  })}
-                </tr>
-              ))}
+                      </tr>
+                    )}
+                  </Fragment>
+                );
+              })}
             </tbody>
           </table>
         </div>

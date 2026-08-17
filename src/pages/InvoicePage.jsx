@@ -4,11 +4,15 @@ import shopConfig from '../config/shopConfig';
 import ConfigField from '../components/ConfigField';
 import BarcodeScanner from '../components/BarcodeScanner';
 import { calcFinalPrice, formatCurrency } from '../utils/calculations';
-import { findInventoryByRowId, markSold, createInvoiceRecord, upsertCustomerOnPurchase } from '../utils/firestoreHelpers';
+import { findInventoryByRowId, recordSale, createInvoiceRecord, upsertCustomerOnPurchase } from '../utils/firestoreHelpers';
 import { functions } from '../firebase';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const emptyDraft = { category: '', type: '', barcode: '', printedPrice: '', discountPercent: 0, inventoryDocId: null, lookupFailed: false, name: '' };
+const emptyDraft = {
+  category: '', type: '', barcode: '', printedPrice: '', discountPercent: 0,
+  inventoryDocId: null, inventoryDoc: null, lookupFailed: false, name: '',
+  isLot: false, quantityRemaining: null, quantity: 1
+};
 const emptyAddress = { line1: '', line2: '', district: '', state: '', pin: '' };
 
 export default function InvoicePage() {
@@ -27,13 +31,19 @@ export default function InvoicePage() {
   async function lookupBarcode(barcode) {
     setDraft((d) => ({ ...d, barcode }));
     if (!barcode) {
-      setDraft((d) => ({ ...d, barcode: '', category: '', type: '', name: '', printedPrice: '', inventoryDocId: null, lookupFailed: false }));
+      setDraft({ ...emptyDraft });
       return;
     }
     setLookingUp(true);
     try {
       const found = await findInventoryByRowId(barcode);
       if (found) {
+        const isLot = Boolean(found.isLot);
+        if (isLot && (Number(found.quantityRemaining) || 0) <= 0) {
+          setDraft({ ...emptyDraft, barcode, lookupFailed: false });
+          setLookingUp(false);
+          return;
+        }
         setDraft((d) => ({
           ...d,
           barcode,
@@ -42,6 +52,10 @@ export default function InvoicePage() {
           name: found.name,
           printedPrice: found.printedPrice,
           inventoryDocId: found.id,
+          inventoryDoc: found,
+          isLot,
+          quantityRemaining: isLot ? Number(found.quantityRemaining) || 0 : null,
+          quantity: 1,
           lookupFailed: false
         }));
       } else {
@@ -53,7 +67,11 @@ export default function InvoicePage() {
           name: '',
           printedPrice: '',
           lookupFailed: true,
-          inventoryDocId: null
+          inventoryDocId: null,
+          inventoryDoc: null,
+          isLot: false,
+          quantityRemaining: null,
+          quantity: 1
         }));
       }
     } finally {
@@ -63,8 +81,10 @@ export default function InvoicePage() {
 
   function addItemToCart() {
     if (!draft.barcode || !draft.printedPrice) return;
+    const qty = draft.isLot ? Math.max(1, Math.min(Number(draft.quantity) || 1, draft.quantityRemaining || 1)) : 1;
+    if (draft.isLot && qty > (draft.quantityRemaining || 0)) return;
     const finalPrice = calcFinalPrice(draft.printedPrice, draft.discountPercent);
-    setItems((prev) => [...prev, { ...draft, finalPrice, id: `${draft.barcode}-${Date.now()}` }]);
+    setItems((prev) => [...prev, { ...draft, quantity: qty, finalPrice, id: `${draft.barcode}-${Date.now()}` }]);
     setDraft(emptyDraft);
   }
 
@@ -72,7 +92,7 @@ export default function InvoicePage() {
     setItems((prev) => prev.filter((i) => i.id !== id));
   }
 
-  const cartTotal = items.reduce((sum, i) => sum + Number(i.finalPrice || 0), 0);
+  const cartTotal = items.reduce((sum, i) => sum + Number(i.finalPrice || 0) * (Number(i.quantity) || 1), 0);
 
   async function handleCheckout() {
     setResult(null);
@@ -103,9 +123,23 @@ export default function InvoicePage() {
 
     setSubmitting(true);
     try {
+      // Slim, PDF/invoice-safe view of each line item — drop internal fields
+      // like the full inventoryDoc (which carries cost) before this gets
+      // written to Firestore or sent to the customer-facing PDF.
+      const invoiceItems = items.map((i) => ({
+        category: i.category,
+        type: i.type,
+        name: i.name,
+        barcode: i.barcode,
+        printedPrice: i.printedPrice,
+        discountPercent: i.discountPercent,
+        finalPrice: i.finalPrice,
+        quantity: Number(i.quantity) || 1
+      }));
+
       // 1. create invoice record
       const invoiceId = await createInvoiceRecord({
-        items: items.map(({ id, ...rest }) => rest),
+        items: invoiceItems,
         total: cartTotal,
         customerName,
         customerPhone,
@@ -114,9 +148,13 @@ export default function InvoicePage() {
         paymentMode
       });
 
-      // 2. mark each inventory row sold
+      // 2. record each sale: decrements lot quantityRemaining (transaction-
+      // safe) or marks a unique item Sold, and writes a permanent sales
+      // record either way so per-sale date/price is never overwritten.
       await Promise.all(
-        items.filter((i) => i.inventoryDocId).map((i) => markSold(i.inventoryDocId, i.finalPrice))
+        items
+          .filter((i) => i.inventoryDoc)
+          .map((i) => recordSale(i.inventoryDoc, i.quantity, Number(i.finalPrice), invoiceId))
       );
 
       // 3. upsert customer record
@@ -132,7 +170,7 @@ export default function InvoicePage() {
         const generateInvoice = httpsCallable(functions, 'generateInvoicePdfAndSend');
         const res = await generateInvoice({
           invoiceId,
-          items,
+          items: invoiceItems,
           total: cartTotal,
           customerName,
           customerPhone,
@@ -140,7 +178,7 @@ export default function InvoicePage() {
         });
         pdfUrl = res?.data?.pdfUrl || null;
       } catch (fnErr) {
-        // Invoice + inventory updates already succeeded \u2014 surface the PDF/WhatsApp
+        // Invoice + inventory updates already succeeded — surface the PDF/WhatsApp
         // failure separately so the sale itself isn't lost.
         setResult({
           type: 'warn',
@@ -206,8 +244,23 @@ export default function InvoicePage() {
             <label>Barcode</label>
             <input type="text" value={draft.barcode} onChange={(e) => lookupBarcode(e.target.value)} placeholder="Scan or type row ID" />
           </div>
+          {draft.isLot && (
+            <div className="field">
+              <label>Quantity to sell (of {draft.quantityRemaining} left)</label>
+              <input
+                type="number"
+                min="1"
+                max={draft.quantityRemaining || 1}
+                value={draft.quantity}
+                onChange={(e) => setDraft((d) => ({
+                  ...d,
+                  quantity: Math.max(1, Math.min(Number(e.target.value) || 1, d.quantityRemaining || 1))
+                }))}
+              />
+            </div>
+          )}
           <div className="field">
-            <label>Printed Price {draft.lookupFailed && <span style={{ color: '#b3372c' }}>(not found \u2014 enter manually)</span>}</label>
+            <label>Printed Price {draft.lookupFailed && <span style={{ color: '#b3372c' }}>(not found — enter manually)</span>}</label>
             <input
               type="number"
               value={draft.printedPrice}
@@ -238,10 +291,13 @@ export default function InvoicePage() {
           <div className="line-items">
             {items.map((i) => (
               <div key={i.id} className="line-item-row">
-                <div><strong>{i.name || i.type}</strong><div className="muted">{i.category} \u00b7 {i.barcode}</div></div>
-                <div className="muted">Printed: {formatCurrency(i.printedPrice)}</div>
+                <div>
+                  <strong>{i.name || i.type}</strong>
+                  <div className="muted">{i.category} · {i.barcode}{i.isLot ? ` · Qty ${i.quantity}` : ''}</div>
+                </div>
+                <div className="muted">Printed: {formatCurrency(i.printedPrice)}{i.isLot ? ' /unit' : ''}</div>
                 <div className="muted">Discount: {i.discountPercent}%</div>
-                <div><strong>{formatCurrency(i.finalPrice)}</strong></div>
+                <div><strong>{formatCurrency(Number(i.finalPrice) * Number(i.quantity || 1))}</strong></div>
                 <button type="button" className="btn btn-danger" onClick={() => removeItem(i.id)}>Remove</button>
               </div>
             ))}

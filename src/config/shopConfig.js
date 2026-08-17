@@ -1,5 +1,5 @@
 // ============================================================================
-// SHOP CONFIG \u2014 everything a shop owner needs to customize lives here.
+// SHOP CONFIG — everything a shop owner needs to customize lives here.
 // No other file should need to change when you add a category, vendor,
 // dropdown option, or swap the logo.
 // ============================================================================
@@ -18,15 +18,34 @@ const shopConfig = {
   collections: {
     inventory: 'inventory',
     customers: 'customers',
-    invoices: 'invoices'
+    invoices: 'invoices',
+    // Every individual sale event (one per unit sold) lives here, separate
+    // from the inventory doc itself. This is what makes lot tracking work:
+    // a lot doc is never overwritten with a single soldDate/soldPrice, each
+    // sale gets its own permanent record instead. See "Lot tracking" below.
+    sales: 'sales'
   },
 
   // ---- Categories -----------------------------------------------------
   // These are shown as options in the "Category" dropdown on Inventory,
   // Invoice, and the Summary filter. Every item is stored in a single
-  // Firestore collection ("inventory") with a `category` field \u2014 this
+  // Firestore collection ("inventory") with a `category` field — this
   // array just drives the dropdown, it does not create new collections.
   categories: ['Necklace', 'Bracelet', 'Ring', 'Earring', 'Bangle', 'Anklet'],
+
+  // ---- Lot tracking ------------------------------------------------------
+  // Categories listed here skip individual barcodes. Instead of creating
+  // one Firestore doc + one printed barcode per physical piece, Inventory
+  // intake creates ONE doc for the whole batch with a `quantityPurchased`
+  // count and ONE shared barcode. Invoice lookup then decrements
+  // `quantityRemaining` per unit sold, and each sale writes its own record
+  // to the `sales` collection (so per-sale date/price is never lost even
+  // though many sales share one inventory doc). Good fit for small/cheap
+  // items like rings and earrings where pasting a unique barcode on every
+  // physical piece isn't practical. Leave a category out of this list to
+  // keep the original one-barcode-per-piece behavior (better for higher
+  // value pieces you want individually traceable, e.g. necklaces).
+  lotTrackedCategories: ['Ring', 'Earring'],
 
   // ---- Type dropdown, scoped per category ------------------------------
   // Key = category name, Value = list of type options for that category.
@@ -93,6 +112,8 @@ const shopConfig = {
     { key: 'type', label: 'Type', filter: 'select', source: 'types' },
     { key: 'vendor', label: 'Vendor', filter: 'select', source: 'vendors' },
     { key: 'name', label: 'Name', filter: 'text', editable: true },
+    { key: 'quantityPurchased', label: 'Qty', filter: 'number' },
+    { key: 'quantityRemaining', label: 'Qty Left', filter: 'number' },
     { key: 'cost', label: 'Cost', filter: 'number' },
     { key: 'profitPercent', label: '% Profit', filter: 'number', editable: true },
     { key: 'boxPrice', label: 'Box Price', filter: 'number', editable: true },
@@ -126,4 +147,8 @@ export function resolveDropdownSource(field, formValues) {
     return shopConfig.types[category] || shopConfig.types._default;
   }
   return shopConfig[field.source] || [];
+}
+
+export function isLotTracked(category) {
+  return shopConfig.lotTrackedCategories.includes(category);
 }

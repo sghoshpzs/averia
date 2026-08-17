@@ -38,32 +38,39 @@ function drawInvoice(doc, data) {
   doc.text(`Payment mode: ${paymentMode}`, 400, 116, { align: 'right' });
 
   // --- Line items table ---
+  // `quantity` is >1 for lot-tracked items (e.g. a batch of rings sold
+  // together on one invoice) — printedPrice/finalPrice are always per-unit,
+  // so the line total shown is finalPrice * quantity.
   let y = 210;
   doc.fillColor(INK).fontSize(10);
   doc.text('Item', 40, y);
-  doc.text('Category', 220, y);
-  doc.text('Printed Price', 340, y, { width: 80, align: 'right' });
-  doc.text('Discount', 420, y, { width: 60, align: 'right' });
-  doc.text('Final Price', 480, y, { width: 75, align: 'right' });
+  doc.text('Category', 190, y);
+  doc.text('Qty', 275, y, { width: 30, align: 'right' });
+  doc.text('Printed Price', 315, y, { width: 75, align: 'right' });
+  doc.text('Discount', 395, y, { width: 55, align: 'right' });
+  doc.text('Line Total', 460, y, { width: 95, align: 'right' });
   y += 16;
   doc.moveTo(40, y).lineTo(555, y).strokeColor('#dddddd').stroke();
   y += 8;
 
   doc.fillColor(MUTED).fontSize(10);
   items.forEach((item) => {
-    doc.text(item.name || item.type || '-', 40, y, { width: 170 });
-    doc.text(item.category || '-', 220, y, { width: 110 });
-    doc.text(Number(item.printedPrice || 0).toFixed(2), 340, y, { width: 80, align: 'right' });
-    doc.text(`${item.discountPercent || 0}%`, 420, y, { width: 60, align: 'right' });
-    doc.text(Number(item.finalPrice || 0).toFixed(2), 480, y, { width: 75, align: 'right' });
+    const qty = Number(item.quantity) || 1;
+    const lineTotal = Number(item.finalPrice || 0) * qty;
+    doc.text(item.name || item.type || '-', 40, y, { width: 145 });
+    doc.text(item.category || '-', 190, y, { width: 80 });
+    doc.text(String(qty), 275, y, { width: 30, align: 'right' });
+    doc.text(Number(item.printedPrice || 0).toFixed(2), 315, y, { width: 75, align: 'right' });
+    doc.text(`${item.discountPercent || 0}%`, 395, y, { width: 55, align: 'right' });
+    doc.text(lineTotal.toFixed(2), 460, y, { width: 95, align: 'right' });
     y += 20;
   });
 
   y += 10;
-  doc.moveTo(340, y).lineTo(555, y).strokeColor('#dddddd').stroke();
+  doc.moveTo(315, y).lineTo(555, y).strokeColor('#dddddd').stroke();
   y += 10;
-  doc.fillColor(INK).fontSize(12).text('Total', 400, y, { width: 80, align: 'right' });
-  doc.fillColor(GOLD).fontSize(12).text(Number(total).toFixed(2), 480, y, { width: 75, align: 'right' });
+  doc.fillColor(INK).fontSize(12).text('Total', 315, y, { width: 140, align: 'right' });
+  doc.fillColor(GOLD).fontSize(12).text(Number(total).toFixed(2), 460, y, { width: 95, align: 'right' });
 
   // --- Footer ---
   doc.fillColor(MUTED).fontSize(8).text('Thank you for shopping with us.', 40, 750, { align: 'center', width: 515 });

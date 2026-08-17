@@ -46,7 +46,7 @@ function LoginScreen({ onGoogleLogin, loading, error }) {
         <div className="auth-brand">Averia Jewellers</div>
         {error && <p className="auth-error">{error}</p>}
         <button type="button" className="auth-button" onClick={onGoogleLogin} disabled={loading}>
-          {loading ? 'Redirecting\u2026' : 'Continue with Google'}
+          {loading ? 'Redirecting…' : 'Continue with Google'}
         </button>
       </div>
     </div>
@@ -101,7 +101,7 @@ export default function App() {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       // Navigates the whole page to Google's sign-in flow, then back to this
-      // app's URL. Nothing to await here for the "success" case \u2014 the app
+      // app's URL. Nothing to await here for the "success" case — the app
       // reloads and onAuthStateChanged/getRedirectResult pick it up above.
       await signInWithRedirect(auth, provider);
     } catch (err) {
@@ -115,7 +115,7 @@ export default function App() {
   }
 
   if (authLoading) {
-    return <div className="auth-shell"><div className="auth-card"><h1>Loading\u2026</h1></div></div>;
+    return <div className="auth-shell"><div className="auth-card"><h1>Loading…</h1></div></div>;
   }
 
   if (!user) {

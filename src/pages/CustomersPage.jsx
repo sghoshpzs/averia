@@ -52,12 +52,12 @@ export default function CustomersPage() {
         <div className="field-grid" style={{ gridTemplateColumns: '3fr auto' }}>
           <div className="field">
             <label>WhatsApp marketing message</label>
-            <input type="text" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="e.g. New AD collection just landed &mdash; 20% off this week!" />
+            <input type="text" value={message} onChange={(e) => setMessage(e.target.value)} placeholder="e.g. New AD collection just landed — 20% off this week!" />
           </div>
           <div className="field">
             <label>&nbsp;</label>
             <button type="button" className="btn btn-primary" disabled={sending || selectedIds.length === 0 || !message.trim()} onClick={sendMarketing}>
-              {sending ? 'Sending&#8230;' : `Send to ${selectedIds.length || ''}`}
+              {sending ? 'Sending…' : `Send to ${selectedIds.length || ''}`}
             </button>
           </div>
         </div>
@@ -71,7 +71,7 @@ export default function CustomersPage() {
       </div>
 
       <div className="panel">
-        {customers.length === 0 && <p className="muted">No customers yet &mdash; they're created automatically from invoices.</p>}
+        {customers.length === 0 && <p className="muted">No customers yet — they're created automatically from invoices.</p>}
         {customers.map((c) => (
           <div key={c.id} className="customer-row">
             <div className="customer-summary" onClick={() => toggleExpand(c.id)}>
@@ -83,18 +83,18 @@ export default function CustomersPage() {
               />
               <div style={{ flex: 1 }}>
                 <div className="name">{c.name}</div>
-                <div className="muted">{c.phone}{c.email ? ` \u00b7 ${c.email}` : ''}{c.address ? ` \u00b7 ${c.address.district || ''}, ${c.address.state || ''}` : ''}</div>
+                <div className="muted">{c.phone}{c.email ? ` · ${c.email}` : ''}{c.address ? ` · ${c.address.district || ''}, ${c.address.state || ''}` : ''}</div>
               </div>
               <div><strong>{formatCurrency(c.totalPurchased)}</strong></div>
-              <span className="muted">{expanded[c.id] ? '\u25b2' : '\u25bc'}</span>
+              <span className="muted">{expanded[c.id] ? '▲' : '▼'}</span>
             </div>
             {expanded[c.id] && (
               <div className="customer-expand">
                 {(c.purchases || []).length === 0 && <p>No purchase history.</p>}
                 {(c.purchases || []).map((p, idx) => (
                   <div key={idx} style={{ marginBottom: 4 }}>
-                    {new Date(p.date).toLocaleDateString()} &mdash; {formatCurrency(p.amount)}
-                    {p.invoiceRef ? <> \u00b7 <a href={`#/invoice/${p.invoiceRef}`}>Invoice link</a></> : null}
+                    {new Date(p.date).toLocaleDateString()} — {formatCurrency(p.amount)}
+                    {p.invoiceRef ? <> · <a href={`#/invoice/${p.invoiceRef}`}>Invoice link</a></> : null}
                   </div>
                 ))}
               </div>

@@ -13,10 +13,7 @@ const navItems = [
 
 export default function Layout({ role, user }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [userMenuOpen, setUserMenuOpen] = useState(false);
   const visibleNavItems = navItems.filter((item) => (role === 'admin' ? true : item.to === '/invoice'));
-  const avatarLabel = user?.displayName || user?.email || 'User';
-  const avatarInitial = String(avatarLabel).trim().charAt(0).toUpperCase() || 'U';
 
   return (
     <div className="app-shell">
@@ -41,34 +38,16 @@ export default function Layout({ role, user }) {
           </nav>
 
           <div className="header-actions">
-            <div className="user-menu">
-              <button
-                type="button"
-                className="user-avatar-button"
-                aria-label="User menu"
-                onClick={() => setUserMenuOpen((v) => !v)}
-              >
-                {user?.photoURL ? (
-                  <img src={user.photoURL} alt={avatarLabel} />
-                ) : (
-                  <span className="user-avatar-fallback">{avatarInitial}</span>
-                )}
-              </button>
-
-              {userMenuOpen && (
-                <button
-                  type="button"
-                  className="logout-button user-menu-button"
-                  onClick={() => {
-                    setUserMenuOpen(false);
-                    signOut(auth);
-                  }}
-                >
-                  Sign out
-                </button>
+            <div className="user-block">
+              {user?.displayName ? (
+                <span className="user-name">{user.displayName}</span>
+              ) : (
+                user?.email && <span className="user-name">{user.email}</span>
               )}
+              <button type="button" className="logout-button" onClick={() => signOut(auth)}>
+                Sign out
+              </button>
             </div>
-
             <button
               type="button"
               className="menu-toggle"
