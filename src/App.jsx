@@ -12,6 +12,7 @@ import Layout from './components/Layout';
 import InventoryPage from './pages/InventoryPage';
 import InvoicePage from './pages/InvoicePage';
 import SummaryPage from './pages/SummaryPage';
+import SalesSummaryPage from './pages/SalesSummaryPage';
 import CustomersPage from './pages/CustomersPage';
 
 const adminEmails = String(import.meta.env.VITE_ALLOWED_ADMINS || '')
@@ -36,6 +37,7 @@ const routeAccess = {
   '/inventory': ['admin'],
   '/invoice': ['admin', 'worker'],
   '/summary': ['admin'],
+  '/sales-summary': ['admin'],
   '/customers': ['admin']
 };
 
@@ -135,6 +137,7 @@ export default function App() {
           <Route path="/inventory" element={routeAccess['/inventory'].includes(role) ? <InventoryPage /> : <AccessDeniedScreen userEmail={user.email} onSignOut={handleSignOut} />} />
           <Route path="/invoice" element={routeAccess['/invoice'].includes(role) ? <InvoicePage /> : <AccessDeniedScreen userEmail={user.email} onSignOut={handleSignOut} />} />
           <Route path="/summary" element={routeAccess['/summary'].includes(role) ? <SummaryPage /> : <AccessDeniedScreen userEmail={user.email} onSignOut={handleSignOut} />} />
+          <Route path="/sales-summary" element={routeAccess['/sales-summary'].includes(role) ? <SalesSummaryPage /> : <AccessDeniedScreen userEmail={user.email} onSignOut={handleSignOut} />} />
           <Route path="/customers" element={routeAccess['/customers'].includes(role) ? <CustomersPage /> : <AccessDeniedScreen userEmail={user.email} onSignOut={handleSignOut} />} />
           <Route path="*" element={<Navigate to={role === 'worker' ? '/invoice' : '/inventory'} replace />} />
         </Route>

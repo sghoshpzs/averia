@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Penna&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Allura&family=Inter:wght@400;500;600;700&display=swap');
 
 :root {
   /* ---- Modern light palette ----
@@ -22,7 +22,7 @@ typography that feels clean and contemporary. */
 
   --font-display: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-body: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-brand: "Penna", "Audrey", "Segoe Script", "Lucida Handwriting", "Bradley Hand", cursive;
+  --font-brand: "Allura", "Segoe Script", "Lucida Handwriting", "Bradley Hand", cursive;
 
   --radius-sm: 6px;
   --radius-md: 12px;
@@ -49,6 +49,20 @@ h2 { font-size: 24px; }
 h3 { font-size: 18px; }
 
 a { color: var(--accent); }
+a.link-toggle {
+  color: var(--ink-muted);
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  padding-bottom: 2px;
+}
+a.link-toggle:hover { color: var(--accent-dark); }
+a.link-toggle.active { color: var(--accent-dark); border-bottom-color: var(--accent); }
+a.link-toggle + a.link-toggle { margin-left: 14px; }
+.link-toggle-group { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; }
+.link-toggle-sep { color: var(--hairline); margin: 0 2px; }
 
 /* ---- App shell / header ---- */
 .app-shell { min-height: 100%; display: flex; flex-direction: column; }
@@ -158,6 +172,7 @@ a { color: var(--accent); }
 .btn-primary:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-secondary { background: var(--surface); color: var(--ink); border-color: var(--hairline); }
 .btn-secondary:hover { border-color: var(--accent); color: var(--accent-dark); }
+.btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-danger { background: var(--danger-tint); color: var(--danger); border-color: #f0c9c4; }
 .btn-danger:hover { background: #f6dcd8; }
 
@@ -217,9 +232,11 @@ table.data-table.excel-table tbody tr:hover td {
   color: var(--accent-dark);
   border-bottom-color: var(--accent);
 }
+.pill-toggle button:disabled { opacity: 0.4; cursor: not-allowed; }
 
 .summary-stat { text-align: left; }
-.summary-stat .value { font-family: var(--font-display); font-size: 28px; color: var(--accent-dark); }.summary-stat .label { font-size: 12px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
+.summary-stat .value { font-family: var(--font-display); font-size: 28px; color: var(--accent-dark); }
+.summary-stat .label { font-size: 12px; color: var(--ink-muted); text-transform: uppercase; letter-spacing: 0.05em; margin-top: 2px; }
 
 .muted { color: var(--ink-muted); font-size: 13px; }
 
@@ -273,6 +290,16 @@ table.data-table.excel-table tbody tr:hover td {
 .customer-summary .name { font-weight: 700; }
 .customer-expand { margin-top: 10px; padding-left: 32px; font-size: 13px; color: var(--ink-muted); }
 
+/* ---- Chart + side-table two-column layout (Inventory/Sales Summary) ---- */
+.chart-with-table { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
+.chart-with-table .side-table-wrap { min-width: 0; }
+
+/* ---- Pagination controls ---- */
+.pagination-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 14px; flex-wrap: wrap; }
+.pagination-bar select { width: auto; }
+.pagination-nav { display: flex; align-items: center; gap: 10px; }
+.pagination-nav span { font-size: 13px; color: var(--ink-muted); }
+
 /* ---- Responsive ---- */
 @media (max-width: 900px) {
   .grid-3, .grid-2 { grid-template-columns: 1fr; }
@@ -285,6 +312,7 @@ table.data-table.excel-table tbody tr:hover td {
   .brand img.logo { height: 40px; }
   .brand .shop-name { font-size: 44px; }
   .line-item-row { grid-template-columns: 1fr 1fr; }
+  .chart-with-table { grid-template-columns: 1fr; }
   /* keep user block items left-aligned on smaller screens to avoid overflow */
   .user-block { align-items: flex-start; }
   .user-name { text-align: left; }

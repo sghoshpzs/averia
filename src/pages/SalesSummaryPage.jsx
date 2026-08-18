@@ -1,14 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import shopConfig from '../config/shopConfig';
-import { subscribeInventory, updateInventoryDoc, markPrinted } from '../utils/firestoreHelpers';
-import { calcPrintedPrice, formatCurrency } from '../utils/calculations';
+import { subscribeSales } from '../utils/firestoreHelpers';
+import { calcProfit, formatCurrency } from '../utils/calculations';
 
 const COLORS = ['#1f5fb5', '#c19a5a', '#1f7a5e', '#8a6fae', '#c92d39', '#3f6b8a'];
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
-// Small text-link toggle used for "only one view at a time, switched by
-// clicking a hyperlink" controls (chart grouping, chart type, side-table view).
 function LinkToggle({ options, value, onChange }) {
   return (
     <span className="link-toggle-group">
@@ -27,89 +25,77 @@ function LinkToggle({ options, value, onChange }) {
   );
 }
 
-export default function SummaryPage() {
-  const [rows, setRows] = useState([]);
+export default function SalesSummaryPage() {
+  const [sales, setSales] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [chartGroupBy, setChartGroupBy] = useState('category'); // 'category' | 'vendor'
   const [chartType, setChartType] = useState('pie'); // 'pie' | 'bar'
-  const [sideTableGroupBy, setSideTableGroupBy] = useState('type'); // 'type' | 'vendor' (only when a category is selected)
+  const [sideTableGroupBy, setSideTableGroupBy] = useState('type'); // 'type' | 'vendor'
   const [columnFilters, setColumnFilters] = useState({});
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
 
-  useEffect(() => subscribeInventory(setRows), []);
+  useEffect(() => subscribeSales(setSales), []);
 
-  const inventoryInScope = useMemo(
-    () => rows.filter((r) => categoryFilter === 'All' || r.category === categoryFilter),
-    [rows, categoryFilter]
+  const salesInScope = useMemo(
+    () => sales.filter((s) => categoryFilter === 'All' || s.category === categoryFilter),
+    [sales, categoryFilter]
   );
 
-  // ---- Summary stats — purely inventory-derived, no date filtering, no
-  // profit (that lives on Sales Summary now) ----
-  const totalInvested = inventoryInScope.reduce(
-    (s, r) => s + (Number(r.cost) || 0) * (Number(r.quantityPurchased) || 1),
-    0
-  );
-  const unitsPurchased = inventoryInScope.reduce((s, r) => s + (Number(r.quantityPurchased) || 1), 0);
-  const unitsSold = inventoryInScope.reduce((s, r) => {
-    if (r.isLot) return s + ((Number(r.quantityPurchased) || 0) - (Number(r.quantityRemaining) || 0));
-    return s + (r.status === 'Sold' ? 1 : 0);
-  }, 0);
+  // ---- Top stats ----
+  const totalSales = salesInScope.reduce((s, sale) => s + (Number(sale.soldPrice) || 0), 0);
+  const totalProfit = salesInScope.reduce((s, sale) => s + calcProfit(sale.soldPrice, sale.cost), 0);
+  const unitsSold = salesInScope.length;
 
-  // ---- Chart: Invested amount by Category or by Vendor ----
+  // ---- Chart: Sold amount by Category or by Vendor ----
   const chartData = useMemo(() => {
     const byGroup = {};
-    inventoryInScope.forEach((r) => {
-      const key = chartGroupBy === 'category' ? r.category : (r.vendor || 'Unknown');
-      const amount = (Number(r.cost) || 0) * (Number(r.quantityPurchased) || 1);
-      byGroup[key] = (byGroup[key] || 0) + amount;
+    salesInScope.forEach((s) => {
+      const key = chartGroupBy === 'category' ? s.category : (s.vendor || 'Unknown');
+      byGroup[key] = (byGroup[key] || 0) + (Number(s.soldPrice) || 0);
     });
-    return Object.entries(byGroup).map(([label, invested]) => ({ label, invested: Number(invested.toFixed(2)) }));
-  }, [inventoryInScope, chartGroupBy]);
+    return Object.entries(byGroup).map(([label, sold]) => ({ label, sold: Number(sold.toFixed(2)) }));
+  }, [salesInScope, chartGroupBy]);
 
-  // ---- Side table: invested amount per Category, or per Type/Vendor when
-  // a specific category is selected (the "alternate view") ----
+  // ---- Side table: sold amount + %profit per Category, or per Type/Vendor
+  // when a specific category is selected ----
   const sideTableRows = useMemo(() => {
-    if (categoryFilter === 'All') {
-      const byCat = {};
-      inventoryInScope.forEach((r) => {
-        const amount = (Number(r.cost) || 0) * (Number(r.quantityPurchased) || 1);
-        byCat[r.category] = (byCat[r.category] || 0) + amount;
-      });
-      return Object.entries(byCat).map(([label, invested]) => ({ label, invested }));
-    }
     const byGroup = {};
-    inventoryInScope.forEach((r) => {
-      const key = sideTableGroupBy === 'type' ? r.type : (r.vendor || 'Unknown');
-      const amount = (Number(r.cost) || 0) * (Number(r.quantityPurchased) || 1);
-      byGroup[key] = (byGroup[key] || 0) + amount;
+    const key = (s) => (categoryFilter === 'All' ? s.category : (sideTableGroupBy === 'type' ? s.type : (s.vendor || 'Unknown')));
+    salesInScope.forEach((s) => {
+      const k = key(s);
+      if (!byGroup[k]) byGroup[k] = { sold: 0, profit: 0, cost: 0 };
+      byGroup[k].sold += Number(s.soldPrice) || 0;
+      byGroup[k].profit += calcProfit(s.soldPrice, s.cost);
+      byGroup[k].cost += Number(s.cost) || 0;
     });
-    return Object.entries(byGroup).map(([label, invested]) => ({ label, invested }));
-  }, [inventoryInScope, categoryFilter, sideTableGroupBy]);
+    return Object.entries(byGroup).map(([label, v]) => ({
+      label,
+      sold: v.sold,
+      profitPercent: v.cost ? Number(((v.profit / v.cost) * 100).toFixed(1)) : 0
+    }));
+  }, [salesInScope, categoryFilter, sideTableGroupBy]);
 
-  // ---- Detail list with per-column filters ----
+  // ---- Detail table with per-column filters ----
   function setColFilter(key, value) {
     setColumnFilters((prev) => ({ ...prev, [key]: value }));
     setPage(0);
   }
 
   const filterOptions = (col) => {
-    if (col.key === 'type') {
-      return Array.from(new Set(Object.values(shopConfig.types).flat())).sort();
-    }
-    if (col.key === 'vendor') {
-      return shopConfig.vendors;
-    }
+    if (col.source === 'yesNo') return shopConfig.yesNo;
     const source = shopConfig[col.source];
     return Array.isArray(source) ? source : [];
   };
 
   const detailRows = useMemo(() => {
-    return inventoryInScope.filter((r) => {
-      return shopConfig.inventoryListColumns.every((col) => {
+    return salesInScope.filter((s) => {
+      return shopConfig.salesColumns.every((col) => {
         const raw = columnFilters[col.key];
         if (!raw) return true;
-        const cellValue = r[col.key];
+        let cellValue = s[col.key];
+        if (col.key === 'profit') cellValue = calcProfit(s.soldPrice, s.cost);
+        if (col.key === 'onlinePurchase') cellValue = s.onlinePurchase ? 'Yes' : 'No';
         if (col.filter === 'number') {
           const m = raw.match(/^(gt|lt|eq)?:?\s*(-?\d+(\.\d+)?)$/i);
           if (!m) return true;
@@ -123,10 +109,13 @@ export default function SummaryPage() {
         if (col.filter === 'select') {
           return String(cellValue) === raw;
         }
+        if (col.filter === 'date') {
+          return String(cellValue ?? '').toLowerCase().includes(raw.toLowerCase());
+        }
         return String(cellValue ?? '').toLowerCase().includes(raw.toLowerCase());
       });
     });
-  }, [inventoryInScope, columnFilters]);
+  }, [salesInScope, columnFilters]);
 
   const totalPages = Math.max(1, Math.ceil(detailRows.length / pageSize));
   const pagedRows = useMemo(() => {
@@ -138,43 +127,13 @@ export default function SummaryPage() {
     if (page > totalPages - 1) setPage(Math.max(0, totalPages - 1));
   }, [totalPages, page]);
 
-  async function handleCellEdit(row, colKey, newValue) {
-    const patch = { [colKey]: colKey === 'name' ? newValue : Number(newValue) };
-    if (colKey === 'boxPrice' || colKey === 'profitPercent') {
-      const cost = colKey === 'cost' ? Number(newValue) : row.cost;
-      const boxPrice = colKey === 'boxPrice' ? Number(newValue) : row.boxPrice;
-      const profitPercent = colKey === 'profitPercent' ? Number(newValue) : row.profitPercent;
-      patch.printedPrice = calcPrintedPrice(cost, profitPercent, boxPrice);
-      if (!row.isLot || (Number(row.quantityRemaining) || 0) === (Number(row.quantityPurchased) || 1)) {
-        patch.status = 'Purchased';
-      }
-    }
-    await updateInventoryDoc(row.id, patch);
-  }
-
-  // CSV export always covers every row matching the current filters, not
-  // just the page currently on screen — pagination is a viewing convenience
-  // only, it doesn't narrow what gets printed/marked.
-  async function handlePrintCsv() {
-    const csvRows = [['row_id', 'printed_price'], ...detailRows.map((r) => [r.rowId, r.printedPrice])];
-    const csv = csvRows.map((row) => row.join(',')).join('\n');
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `inventory-print-${Date.now()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    await markPrinted(detailRows.map((r) => r.id));
-  }
-
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', marginBottom: 16 }}>
         <div>
-          <h1 style={{ margin: 0 }}>Inventory Summary</h1>
+          <h1 style={{ margin: 0 }}>Sales Summary</h1>
           <p className="muted" style={{ margin: '8px 0 0', maxWidth: 520 }}>
-            Current stock on hand — what you've invested, how much has sold, and where it's concentrated.
+            Every completed sale, with revenue and margin by category, sub-category, and vendor.
           </p>
         </div>
 
@@ -191,12 +150,12 @@ export default function SummaryPage() {
 
       <div className="grid-3">
         <div className="panel summary-stat">
-          <div className="value">{formatCurrency(totalInvested)}</div>
-          <div className="label">Total Invested</div>
+          <div className="value">{formatCurrency(totalSales)}</div>
+          <div className="label">Total Sales</div>
         </div>
         <div className="panel summary-stat">
-          <div className="value">{unitsPurchased}</div>
-          <div className="label">Units Purchased</div>
+          <div className="value">{formatCurrency(totalProfit)}</div>
+          <div className="label">Total Profit</div>
         </div>
         <div className="panel summary-stat">
           <div className="value">{unitsSold}</div>
@@ -206,7 +165,7 @@ export default function SummaryPage() {
 
       <div className="panel">
         <div className="panel-title-row">
-          <h2>Invested Amount</h2>
+          <h2>Sold Amount</h2>
           <div style={{ display: 'flex', gap: 20, alignItems: 'center' }}>
             <LinkToggle
               value={chartGroupBy}
@@ -224,11 +183,11 @@ export default function SummaryPage() {
         <div className="chart-with-table">
           <div>
             {chartData.length === 0 ? (
-              <p className="muted">No inventory in this scope yet.</p>
+              <p className="muted">No sales in this scope yet.</p>
             ) : chartType === 'pie' ? (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
-                  <Pie data={chartData} dataKey="invested" nameKey="label" outerRadius={110} label>
+                  <Pie data={chartData} dataKey="sold" nameKey="label" outerRadius={110} label>
                     {chartData.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
                   </Pie>
                   <Tooltip formatter={(v) => formatCurrency(v)} />
@@ -241,7 +200,7 @@ export default function SummaryPage() {
                   <XAxis dataKey="label" stroke="#5f738d" />
                   <YAxis stroke="#5f738d" />
                   <Tooltip formatter={(v) => formatCurrency(v)} />
-                  <Bar dataKey="invested" fill="#1f5fb5" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="sold" fill="#1f5fb5" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -264,15 +223,16 @@ export default function SummaryPage() {
               <thead>
                 <tr>
                   <th>{categoryFilter === 'All' ? 'Category' : (sideTableGroupBy === 'type' ? 'Sub-Category' : 'Vendor')}</th>
-                  <th>Invested</th>
+                  <th>Sold Amount</th>
+                  <th>% Profit</th>
                 </tr>
               </thead>
               <tbody>
                 {sideTableRows.map((r) => (
-                  <tr key={r.label}><td>{r.label}</td><td>{formatCurrency(r.invested)}</td></tr>
+                  <tr key={r.label}><td>{r.label}</td><td>{formatCurrency(r.sold)}</td><td>{r.profitPercent}%</td></tr>
                 ))}
                 {sideTableRows.length === 0 && (
-                  <tr><td colSpan={2} className="muted">No data yet.</td></tr>
+                  <tr><td colSpan={3} className="muted">No data yet.</td></tr>
                 )}
               </tbody>
             </table>
@@ -282,19 +242,13 @@ export default function SummaryPage() {
 
       <div className="panel">
         <div className="panel-title-row">
-          <h2>Inventory Detail ({detailRows.length})</h2>
-          <button type="button" className="btn btn-secondary" onClick={handlePrintCsv} disabled={detailRows.length === 0}>
-            Print CSV
-          </button>
+          <h2>Sales Detail ({detailRows.length})</h2>
         </div>
-        <p className="muted" style={{ marginTop: -8, marginBottom: 12 }}>
-          Rows with a gold "lot" badge share one barcode across multiple units.
-        </p>
         <div className="summary-table-wrapper">
           <table className="data-table wide excel-table">
             <thead>
               <tr>
-                {shopConfig.inventoryListColumns.map((col) => (
+                {shopConfig.salesColumns.map((col) => (
                   <th key={col.key}>
                     {col.label}
                     {col.filter === 'select' ? (
@@ -315,52 +269,32 @@ export default function SummaryPage() {
               </tr>
             </thead>
             <tbody>
-              {pagedRows.map((row) => (
-                <tr key={row.id}>
-                  {shopConfig.inventoryListColumns.map((col) => {
-                    const editable = col.editable;
-                    const val = row[col.key];
-
-                    if (col.key === 'rowId') {
+              {pagedRows.map((s) => (
+                <tr key={s.id}>
+                  {shopConfig.salesColumns.map((col) => {
+                    if (col.key === 'invoiceId') return <td key={col.key}>{s.invoiceId || s.invoiceRef || '\u2014'}</td>;
+                    if (col.key === 'onlinePurchase') {
                       return (
                         <td key={col.key}>
-                          {val}
-                          {row.isLot && <span className="badge badge-printed" style={{ marginLeft: 6 }}>lot × {row.quantityPurchased}</span>}
+                          <input type="checkbox" checked={Boolean(s.onlinePurchase)} readOnly />
                         </td>
                       );
                     }
-                    if (col.key === 'quantityPurchased' || col.key === 'quantityRemaining') {
-                      return <td key={col.key}>{row.isLot ? (val ?? 0) : (col.key === 'quantityPurchased' ? 1 : '\u2014')}</td>;
+                    if (col.key === 'profit') return <td key={col.key}>{formatCurrency(calcProfit(s.soldPrice, s.cost))}</td>;
+                    if (col.key === 'soldDate') {
+                      return <td key={col.key}>{s.soldDateMillis ? new Date(s.soldDateMillis).toLocaleDateString() : '\u2014'}</td>;
                     }
-                    if (col.key === 'status') {
-                      return (
-                        <td key={col.key}>
-                          <span className={`badge badge-${String(val).toLowerCase()}`}>{val}</span>
-                        </td>
-                      );
+                    if (col.filter === 'number' && (col.key === 'printedPrice' || col.key === 'soldPrice')) {
+                      return <td key={col.key}>{formatCurrency(s[col.key])}</td>;
                     }
-                    if (col.filter === 'date') {
-                      const millis = row.createdAtMillis;
-                      return <td key={col.key}>{millis ? new Date(millis).toLocaleDateString() : '\u2014'}</td>;
-                    }
-                    if (editable) {
-                      return (
-                        <td key={col.key}>
-                          <input
-                            className="filter-input"
-                            style={{ marginTop: 0 }}
-                            defaultValue={val}
-                            onBlur={(e) => e.target.value !== String(val) && handleCellEdit(row, col.key, e.target.value)}
-                          />
-                        </td>
-                      );
-                    }
+                    if (col.key === 'discountPercent') return <td key={col.key}>{s.discountPercent || 0}%</td>;
+                    const val = s[col.key];
                     return <td key={col.key}>{typeof val === 'number' ? val.toLocaleString('en-IN') : (val ?? '\u2014')}</td>;
                   })}
                 </tr>
               ))}
               {pagedRows.length === 0 && (
-                <tr><td colSpan={shopConfig.inventoryListColumns.length} className="muted">No rows match the current filters.</td></tr>
+                <tr><td colSpan={shopConfig.salesColumns.length} className="muted">No sales match the current filters.</td></tr>
               )}
             </tbody>
           </table>

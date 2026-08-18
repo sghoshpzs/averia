@@ -162,6 +162,21 @@ export async function checkoutInvoice(cartItems, invoiceData) {
     resolved.forEach(({ item, invRef, data }) => {
       const qty = Math.max(1, Number(item.quantity) || 1);
       const soldPricePerUnit = item.soldPricePerUnit;
+      // Denormalized onto every sale doc so the Sales Summary table can
+      // render directly from `sales` without joining against `invoices` or
+      // `inventory` at read time.
+      const saleExtras = {
+        vendor: data.vendor || null,
+        printedPrice: item.printedPrice ?? null,
+        discountPercent: item.discountPercent ?? 0,
+        quantity: 1, // each doc is always exactly one physical unit sold
+        invoiceId: invoiceRef.id,
+        customerName: invoiceData.customerName || null,
+        customerPhone: invoiceData.customerPhone || null,
+        customerEmail: invoiceData.customerEmail || null,
+        onlinePurchase: Boolean(invoiceData.onlinePurchase),
+        paymentMode: invoiceData.paymentMode || null
+      };
 
       if (data.isLot) {
         const nextRemaining = (Number(data.quantityRemaining) || 0) - qty;
@@ -181,7 +196,8 @@ export async function checkoutInvoice(cartItems, invoiceData) {
             soldPrice: soldPricePerUnit,
             soldDate: serverTimestamp(),
             soldDateMillis: Date.now(),
-            invoiceRef: invoiceRef.id
+            invoiceRef: invoiceRef.id,
+            ...saleExtras
           });
         }
       } else {
@@ -202,7 +218,8 @@ export async function checkoutInvoice(cartItems, invoiceData) {
           soldPrice: soldPricePerUnit,
           soldDate: serverTimestamp(),
           soldDateMillis: Date.now(),
-          invoiceRef: invoiceRef.id
+          invoiceRef: invoiceRef.id,
+          ...saleExtras
         });
       }
     });

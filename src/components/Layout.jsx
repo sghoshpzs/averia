@@ -7,7 +7,8 @@ import shopConfig from '../config/shopConfig';
 const navItems = [
   { to: '/inventory', label: 'Inventory' },
   { to: '/invoice', label: 'Invoice' },
-  { to: '/summary', label: 'Summary' },
+  { to: '/summary', label: 'Inventory Summary' },
+  { to: '/sales-summary', label: 'Sales Summary' },
   { to: '/customers', label: 'Customers' }
 ];
 

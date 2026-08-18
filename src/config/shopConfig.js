@@ -104,7 +104,10 @@ const shopConfig = {
     { key: 'finalPrice', label: 'Final Price', type: 'readonly' }
   ],
 
-  // ---- Inventory list columns (Summary page table) shown + filterable ----
+  // ---- Inventory list columns (Inventory Summary table) shown + filterable ----
+  // Sale-specific fields (sold price, profit, sold date) live on the Sales
+  // Summary page instead — see salesColumns below — since this table now
+  // reflects current inventory holdings only, not sale history.
   inventoryListColumns: [
     { key: 'rowId', label: 'Row ID', filter: 'text' },
     { key: 'sku', label: 'SKU', filter: 'text' },
@@ -118,12 +121,32 @@ const shopConfig = {
     { key: 'profitPercent', label: '% Profit', filter: 'number', editable: true },
     { key: 'boxPrice', label: 'Box Price', filter: 'number', editable: true },
     { key: 'printedPrice', label: 'Printed Price', filter: 'number' },
+    { key: 'status', label: 'Status', filter: 'select', source: 'statuses' },
+    { key: 'created', label: 'Created', filter: 'date' }
+  ],
+
+  // ---- Sales list columns (Sales Summary table) shown + filterable --------
+  salesColumns: [
+    { key: 'invoiceId', label: 'Invoice ID', filter: 'text' },
+    { key: 'rowId', label: 'Inventory ID', filter: 'text' },
+    { key: 'customerName', label: 'Customer Name', filter: 'text' },
+    { key: 'customerPhone', label: 'Customer Ph', filter: 'text' },
+    { key: 'customerEmail', label: 'Customer Email', filter: 'text' },
+    { key: 'onlinePurchase', label: 'Online', filter: 'select', source: 'yesNo' },
+    { key: 'paymentMode', label: 'Payment Mode', filter: 'select', source: 'paymentModes' },
+    { key: 'category', label: 'Category', filter: 'select', source: 'categories' },
+    { key: 'type', label: 'Type', filter: 'text' },
+    { key: 'vendor', label: 'Vendor', filter: 'select', source: 'vendors' },
+    { key: 'name', label: 'Name', filter: 'text' },
+    { key: 'quantity', label: 'Qty', filter: 'number' },
+    { key: 'printedPrice', label: 'Printed Price', filter: 'number' },
+    { key: 'discountPercent', label: 'Discount', filter: 'number' },
     { key: 'soldPrice', label: 'Sold Price', filter: 'number' },
     { key: 'profit', label: 'Profit', filter: 'number' },
-    { key: 'status', label: 'Status', filter: 'select', source: 'statuses' },
-    { key: 'created', label: 'Created', filter: 'date' },
     { key: 'soldDate', label: 'Sold Date', filter: 'date' }
   ],
+
+  yesNo: ['Yes', 'No'],
 
   statuses: ['Purchased', 'Printed', 'Sold'],
 

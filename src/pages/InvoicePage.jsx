@@ -81,8 +81,15 @@ export default function InvoicePage() {
 
   function addItemToCart() {
     if (!draft.barcode || !draft.printedPrice) return;
-    const qty = draft.isLot ? Math.max(1, Math.min(Number(draft.quantity) || 1, draft.quantityRemaining || 1)) : 1;
-    if (draft.isLot && qty > (draft.quantityRemaining || 0)) return;
+    let qty = Math.max(1, Number(draft.quantity) || 1);
+    if (draft.isLot) {
+      qty = Math.min(qty, draft.quantityRemaining || 1);
+      if (qty > (draft.quantityRemaining || 0)) return;
+    } else if (draft.inventoryDocId) {
+      // Uniquely-barcoded item — only one physical piece exists under this
+      // code, so #Items can't exceed 1 regardless of what was typed.
+      qty = 1;
+    }
     const finalPrice = calcFinalPrice(draft.printedPrice, draft.discountPercent);
     setItems((prev) => [...prev, { ...draft, quantity: qty, finalPrice, id: `${draft.barcode}-${Date.now()}` }]);
     setDraft(emptyDraft);
@@ -143,12 +150,19 @@ export default function InvoicePage() {
       // second ago) can never leave behind an invoice with no matching
       // stock deduction.
       const invoiceId = await checkoutInvoice(
-        items.map((i) => ({ inventoryDoc: i.inventoryDoc, quantity: i.quantity, soldPricePerUnit: Number(i.finalPrice) })),
+        items.map((i) => ({
+          inventoryDoc: i.inventoryDoc,
+          quantity: i.quantity,
+          soldPricePerUnit: Number(i.finalPrice),
+          printedPrice: i.printedPrice,
+          discountPercent: i.discountPercent
+        })),
         {
           items: invoiceItems,
           total: cartTotal,
           customerName,
           customerPhone,
+          customerEmail: customerEmail || null,
           onlinePurchase,
           address: onlinePurchase ? address : null,
           paymentMode
@@ -246,20 +260,27 @@ export default function InvoicePage() {
             <input type="text" value={draft.barcode} onChange={(e) => lookupBarcode(e.target.value)} placeholder="Scan or type row ID" />
           </div>
           {draft.isLot && (
-            <div className="field">
-              <label>Quantity to sell (of {draft.quantityRemaining} left)</label>
-              <input
-                type="number"
-                min="1"
-                max={draft.quantityRemaining || 1}
-                value={draft.quantity}
-                onChange={(e) => setDraft((d) => ({
-                  ...d,
-                  quantity: Math.max(1, Math.min(Number(e.target.value) || 1, d.quantityRemaining || 1))
-                }))}
-              />
-            </div>
+            <p className="muted" style={{ margin: 0 }}>{draft.quantityRemaining} unit(s) left in this lot.</p>
           )}
+          <div className="field">
+            <label>
+              #Items
+              {!draft.isLot && draft.inventoryDocId && <span style={{ color: 'var(--ink-muted)' }}> (max 1 — unique barcode)</span>}
+            </label>
+            <input
+              type="number"
+              min="1"
+              max={draft.isLot ? (draft.quantityRemaining || 1) : (draft.inventoryDocId ? 1 : undefined)}
+              value={draft.quantity}
+              disabled={!draft.isLot && Boolean(draft.inventoryDocId)}
+              onChange={(e) => setDraft((d) => {
+                let next = Math.max(1, Number(e.target.value) || 1);
+                if (d.isLot) next = Math.min(next, d.quantityRemaining || 1);
+                else if (d.inventoryDocId) next = 1;
+                return { ...d, quantity: next };
+              })}
+            />
+          </div>
           <div className="field">
             <label>Printed Price {draft.lookupFailed && <span style={{ color: '#b3372c' }}>(not found — enter manually)</span>}</label>
             <input

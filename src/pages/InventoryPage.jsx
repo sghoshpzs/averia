@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import shopConfig, { resolveDefault, isLotTracked } from '../config/shopConfig';
+import { useEffect, useState } from 'react';
+import shopConfig, { resolveDefault } from '../config/shopConfig';
 import ConfigField from '../components/ConfigField';
 import { calcPrintedPrice, generateRowId, generateSku } from '../utils/calculations';
 import { addInventoryRows, addInventoryLot } from '../utils/firestoreHelpers';
@@ -17,8 +17,25 @@ export default function InventoryPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
 
+  // "Batch" auto-checks whenever # Items > 1, but the user can uncheck it
+  // manually (e.g. bulk-entering several IDENTICAL pieces that still need
+  // individual barcodes). batchTouched tracks whether they've overridden it
+  // by hand, so the auto-behavior doesn't keep fighting their choice.
+  const [batchChecked, setBatchChecked] = useState(false);
+  const [batchTouched, setBatchTouched] = useState(false);
+
   const printedPrice = calcPrintedPrice(values.cost, values.profitPercent, values.boxPrice);
-  const lotMode = isLotTracked(values.category);
+
+  useEffect(() => {
+    if (!batchTouched) {
+      setBatchChecked(Number(values.itemCount) > 1);
+    }
+  }, [values.itemCount, batchTouched]);
+
+  function handleBatchToggle(checked) {
+    setBatchTouched(true);
+    setBatchChecked(checked);
+  }
 
   function handleChange(key, val) {
     setValues((prev) => {
@@ -54,7 +71,7 @@ export default function InventoryPage() {
         printedPrice: calcPrintedPrice(values.cost, values.profitPercent, values.boxPrice)
       };
 
-      if (lotMode) {
+      if (batchChecked) {
         const lot = await addInventoryLot(baseRow, itemCount, generateRowId, generateSku);
         setMessage({
           type: 'success',
@@ -65,6 +82,7 @@ export default function InventoryPage() {
         setMessage({ type: 'success', text: `Saved ${rows.length} record(s). Row ID(s): ${rows.map((r) => r.rowId).join(', ')}` });
       }
       setValues(buildInitialValues());
+      setBatchTouched(false);
     } catch (err) {
       setMessage({ type: 'error', text: err.message || 'Failed to save.' });
     } finally {
@@ -104,13 +122,23 @@ export default function InventoryPage() {
               />
             );
           })}
+          <div className="field">
+            <label>Batch</label>
+            <input
+              type="checkbox"
+              checked={batchChecked}
+              onChange={(e) => handleBatchToggle(e.target.checked)}
+              style={{ width: 20, height: 20 }}
+            />
+          </div>
         </div>
 
-        {lotMode && (
+        {batchChecked && (
           <p className="muted" style={{ marginTop: 12 }}>
-            {values.category} is set up for lot tracking (see shopConfig.js). This save will create <strong>one</strong> inventory
-            record with <strong>one</strong> shared barcode for all {values.itemCount || 1} unit(s) — print a single label
-            for the batch instead of one per piece. Each unit's sale is still tracked individually at checkout.
+            Batch is checked — this save will create <strong>one</strong> inventory record with <strong>one</strong> shared
+            barcode for all {values.itemCount || 1} unit(s). Print a single label for the batch instead of one per piece.
+            Each unit's sale is still tracked individually at checkout. Uncheck Batch if you'd rather print
+            {' '}{values.itemCount || 1} individual barcodes instead.
           </p>
         )}
 
