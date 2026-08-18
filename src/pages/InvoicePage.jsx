@@ -1,15 +1,15 @@
 import { useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import shopConfig from '../config/shopConfig';
-import ConfigField from '../components/ConfigField';
 import BarcodeScanner from '../components/BarcodeScanner';
 import { calcFinalPrice, formatCurrency } from '../utils/calculations';
-import { findInventoryByRowId, checkoutInvoice, upsertCustomerOnPurchase } from '../utils/firestoreHelpers';
+import { findInventoryByRowId, checkoutInvoice, upsertCustomerOnPurchase, reserveInvoiceId } from '../utils/firestoreHelpers';
 import { functions } from '../firebase';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+const BARCODE_NUMBER_REGEX = /^\d+$/;
 const emptyDraft = {
-  category: '', type: '', barcode: '', printedPrice: '', discountPercent: 0,
+  category: '', type: '', barcode: '', barcodeError: null, printedPrice: '', discountPercent: 0,
   inventoryDocId: null, inventoryDoc: null, lookupFailed: false, name: '',
   isLot: false, quantityRemaining: null, quantity: 1
 };
@@ -27,9 +27,10 @@ export default function InvoicePage() {
   const [paymentMode, setPaymentMode] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
+  const [invoiceId, setInvoiceId] = useState(reserveInvoiceId);
 
   async function lookupBarcode(barcode) {
-    setDraft((d) => ({ ...d, barcode }));
+    setDraft((d) => ({ ...d, barcode, barcodeError: null }));
     if (!barcode) {
       setDraft({ ...emptyDraft });
       return;
@@ -79,6 +80,26 @@ export default function InvoicePage() {
     }
   }
 
+  // Barcode must be a plain positive number (looked up in inventory) or the
+  // literal "NA" (manual entry, no inventory lookup) — anything else is
+  // rejected with an inline error instead of being looked up.
+  function handleBarcodeChange(raw) {
+    const trimmed = raw.trim();
+    if (!trimmed) {
+      setDraft({ ...emptyDraft });
+      return;
+    }
+    if (trimmed.toUpperCase() === 'NA') {
+      setDraft({ ...emptyDraft, barcode: 'NA', lookupFailed: true });
+      return;
+    }
+    if (!BARCODE_NUMBER_REGEX.test(trimmed)) {
+      setDraft((d) => ({ ...d, barcode: raw, barcodeError: 'Barcode must be a number or "NA".' }));
+      return;
+    }
+    lookupBarcode(trimmed);
+  }
+
   function addItemToCart() {
     if (!draft.barcode || !draft.printedPrice) return;
     let qty = Math.max(1, Number(draft.quantity) || 1);
@@ -100,6 +121,7 @@ export default function InvoicePage() {
   }
 
   const cartTotal = items.reduce((sum, i) => sum + Number(i.finalPrice || 0) * (Number(i.quantity) || 1), 0);
+  const activated = Boolean(draft.barcode) && !draft.barcodeError;
 
   async function handleCheckout() {
     setResult(null);
@@ -149,7 +171,7 @@ export default function InvoicePage() {
       // none of it does, so a failed line item (e.g. a lot sold out a
       // second ago) can never leave behind an invoice with no matching
       // stock deduction.
-      const invoiceId = await checkoutInvoice(
+      await checkoutInvoice(
         items.map((i) => ({
           inventoryDoc: i.inventoryDoc,
           quantity: i.quantity,
@@ -166,7 +188,8 @@ export default function InvoicePage() {
           onlinePurchase,
           address: onlinePurchase ? address : null,
           paymentMode
-        }
+        },
+        invoiceId
       );
 
       // 3. upsert customer record — deliberately outside the transaction
@@ -215,6 +238,7 @@ export default function InvoicePage() {
       setOnlinePurchase(false);
       setAddress(emptyAddress);
       setPaymentMode('');
+      setInvoiceId(reserveInvoiceId());
     } catch (err) {
       setResult({ type: 'error', text: err.message || 'Checkout failed.' });
     } finally {
@@ -230,8 +254,18 @@ export default function InvoicePage() {
       <div className="panel">
         <div className="field-grid">
           <div className="field">
-            <label>Scan item</label>
-            <BarcodeScanner onDetected={lookupBarcode} />
+            <label>Barcode</label>
+            <div className="barcode-input-row">
+              <input
+                type="text"
+                value={draft.barcode}
+                onChange={(e) => handleBarcodeChange(e.target.value)}
+                placeholder="Scan or type barcode / NA"
+                className={activated ? 'opaque' : ''}
+              />
+              <BarcodeScanner compact onDetected={handleBarcodeChange} />
+            </div>
+            {draft.barcodeError && <p className="muted" style={{ color: '#b3372c', margin: '4px 0 0' }}>{draft.barcodeError}</p>}
           </div>
           <div className="field">
             <label>Category</label>
@@ -239,6 +273,7 @@ export default function InvoicePage() {
               value={draft.category}
               onChange={(e) => setDraft((d) => ({ ...d, category: e.target.value, type: '' }))}
               disabled={Boolean(draft.inventoryDocId) && !draft.lookupFailed}
+              className={activated ? 'opaque' : ''}
             >
               <option value="" disabled>Select category</option>
               {shopConfig.categories.map((c) => <option key={c} value={c}>{c}</option>)}
@@ -250,14 +285,11 @@ export default function InvoicePage() {
               value={draft.type}
               onChange={(e) => setDraft((d) => ({ ...d, type: e.target.value }))}
               disabled={Boolean(draft.inventoryDocId) && !draft.lookupFailed || !draft.category}
+              className={activated ? 'opaque' : ''}
             >
               <option value="" disabled>Select type</option>
               {(shopConfig.types[draft.category] || shopConfig.types._default).map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
-          </div>
-          <div className="field">
-            <label>Barcode</label>
-            <input type="text" value={draft.barcode} onChange={(e) => lookupBarcode(e.target.value)} placeholder="Scan or type row ID" />
           </div>
           {draft.isLot && (
             <p className="muted" style={{ margin: 0 }}>{draft.quantityRemaining} unit(s) left in this lot.</p>
@@ -273,6 +305,7 @@ export default function InvoicePage() {
               max={draft.isLot ? (draft.quantityRemaining || 1) : (draft.inventoryDocId ? 1 : undefined)}
               value={draft.quantity}
               disabled={!draft.isLot && Boolean(draft.inventoryDocId)}
+              className={activated ? 'opaque' : ''}
               onChange={(e) => setDraft((d) => {
                 let next = Math.max(1, Number(e.target.value) || 1);
                 if (d.isLot) next = Math.min(next, d.quantityRemaining || 1);
@@ -301,8 +334,8 @@ export default function InvoicePage() {
           </div>
         </div>
         <div style={{ marginTop: 12 }}>
-          <button type="button" className="btn btn-secondary" disabled={lookingUp || !draft.printedPrice} onClick={addItemToCart}>
-            Add item to cart
+          <button type="button" className="btn btn-secondary" disabled={lookingUp || !draft.printedPrice || Boolean(draft.barcodeError)} onClick={addItemToCart}>
+            Add to Cart
           </button>
         </div>
       </div>
@@ -312,14 +345,14 @@ export default function InvoicePage() {
           <h2>Cart ({items.length})</h2>
           <div className="line-items">
             {items.map((i) => (
-              <div key={i.id} className="line-item-row">
-                <div>
-                  <strong>{i.name || i.type}</strong>
-                  <div className="muted">{i.category} · {i.barcode}{i.isLot ? ` · Qty ${i.quantity}` : ''}</div>
-                </div>
-                <div className="muted">Printed: {formatCurrency(i.printedPrice)}{i.isLot ? ' /unit' : ''}</div>
-                <div className="muted">Discount: {i.discountPercent}%</div>
-                <div><strong>{formatCurrency(Number(i.finalPrice) * Number(i.quantity || 1))}</strong></div>
+              <div key={i.id} className="line-item-row detailed">
+                <div className="line-item-cell"><span className="cell-label">Barcode</span><span className="cell-value">{i.barcode}</span></div>
+                <div className="line-item-cell"><span className="cell-label">Category</span><span className="cell-value">{i.category}</span></div>
+                <div className="line-item-cell"><span className="cell-label">Type</span><span className="cell-value">{i.type}</span></div>
+                <div className="line-item-cell"><span className="cell-label">#Items</span><span className="cell-value">{i.quantity}</span></div>
+                <div className="line-item-cell"><span className="cell-label">Printed Price</span><span className="cell-value">{formatCurrency(i.printedPrice)}</span></div>
+                <div className="line-item-cell"><span className="cell-label">% Discount</span><span className="cell-value">{i.discountPercent || 0}%</span></div>
+                <div className="line-item-cell"><span className="cell-label">Final Price</span><span className="cell-value">{formatCurrency(Number(i.finalPrice) * Number(i.quantity || 1))}</span></div>
                 <button type="button" className="btn btn-danger" onClick={() => removeItem(i.id)}>Remove</button>
               </div>
             ))}
@@ -331,6 +364,10 @@ export default function InvoicePage() {
       <div className="panel">
         <h2>Checkout</h2>
         <div className="field-grid">
+          <div className="field">
+            <label>Invoice Id</label>
+            <input type="text" readOnly value={invoiceId} className="opaque" />
+          </div>
           <div className="field">
             <label>Customer Name</label>
             <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
@@ -374,7 +411,7 @@ export default function InvoicePage() {
 
         <div style={{ marginTop: 16 }}>
           <button type="button" className="btn btn-primary" disabled={submitting} onClick={handleCheckout}>
-            {submitting ? 'Processing\u2026' : 'Complete sale & send invoice'}
+            {submitting ? 'Processing\u2026' : 'Send Invoice'}
           </button>
         </div>
       </div>

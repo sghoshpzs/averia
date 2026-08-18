@@ -23,7 +23,8 @@ const shopConfig = {
     // from the inventory doc itself. This is what makes lot tracking work:
     // a lot doc is never overwritten with a single soldDate/soldPrice, each
     // sale gets its own permanent record instead. See "Lot tracking" below.
-    sales: 'sales'
+    sales: 'sales',
+    expenses: 'expenses'
   },
 
   // ---- Categories -----------------------------------------------------
@@ -149,6 +150,16 @@ const shopConfig = {
   yesNo: ['Yes', 'No'],
 
   statuses: ['Purchased', 'Printed', 'Sold'],
+
+  // ---- Ad-Hoc Expenses -----------------------------------------------
+  expenseCategories: ['Rent', 'Electricity Bill', 'Repair Work', 'Other'],
+
+  expenseColumns: [
+    { key: 'date', label: 'Date', filter: 'date' },
+    { key: 'category', label: 'Category', filter: 'select', source: 'expenseCategories' },
+    { key: 'description', label: 'Description', filter: 'text' },
+    { key: 'amount', label: 'Amount', filter: 'number' }
+  ],
 
   // ---- Twilio WhatsApp sandbox / production number, used only for display
   // in the UI (actual credentials live server-side in Cloud Functions env). --

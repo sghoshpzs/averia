@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
 import { Html5Qrcode } from 'html5-qrcode';
 
-// Renders a "Scan barcode" button. On click, opens the device camera in a
-// panel and calls onDetected(code) the first time a barcode/QR is read,
-// then stops the camera automatically.
-export default function BarcodeScanner({ onDetected }) {
+// Renders a "Scan barcode" button (or, in compact mode, a bare camera-icon
+// button meant to sit inline next to a text input). On click, opens the
+// device camera in a panel and calls onDetected(code) the first time a
+// barcode/QR is read, then stops the camera automatically.
+export default function BarcodeScanner({ onDetected, compact }) {
   const [active, setActive] = useState(false);
   const [error, setError] = useState(null);
   const elementId = useRef(`scanner-${Math.random().toString(36).slice(2)}`);
@@ -45,6 +46,13 @@ export default function BarcodeScanner({ onDetected }) {
   }
 
   if (!active) {
+    if (compact) {
+      return (
+        <button type="button" className="barcode-scan-icon-btn" title="Scan barcode" aria-label="Scan barcode" onClick={() => setActive(true)}>
+          📷
+        </button>
+      );
+    }
     return <button type="button" className="btn btn-secondary" onClick={() => setActive(true)}>📷 Scan barcode</button>;
   }
 

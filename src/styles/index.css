@@ -192,6 +192,14 @@ table.data-table select.filter-input {
   width: 100%; display: block; background: rgba(255, 255, 255, 0.7); -webkit-backdrop-filter: blur(2px); backdrop-filter: blur(2px); border: 1px solid var(--hairline);
   color: var(--ink); padding: 8px 10px; border-radius: 4px; font-size: 12px; margin-top: 4px; opacity: 0.96;
 }
+/* An editable cell that should read as plain text, not a boxed input
+   (e.g. Name in the detail table body — only header filter inputs keep
+   the boxed look). */
+table.data-table input.filter-input.plain {
+  background: transparent; border: 1px solid transparent; -webkit-backdrop-filter: none; backdrop-filter: none;
+  padding: 0; margin-top: 0; opacity: 1; border-radius: 0;
+}
+table.data-table input.filter-input.plain:focus { border-color: var(--hairline); padding: 4px 6px; }
 table.data-table.excel-table {
   min-width: 2200px;
 }
@@ -294,6 +302,68 @@ table.data-table.excel-table tbody tr:hover td {
 .chart-with-table { display: grid; grid-template-columns: 1.3fr 1fr; gap: 20px; align-items: start; }
 .chart-with-table .side-table-wrap { min-width: 0; }
 
+/* ---- Multi-select dropdown (date filter, etc.) ---- */
+.date-filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+.multiselect { position: relative; }
+.multiselect-trigger {
+  display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--hairline);
+  border-radius: 999px; padding: 9px 14px; font-size: 13px; font-weight: 600; color: var(--ink); cursor: pointer;
+}
+.multiselect-trigger:hover { border-color: var(--accent); color: var(--accent-dark); }
+.multiselect-count {
+  background: var(--accent); color: #fff; border-radius: 999px; font-size: 11px; font-weight: 700;
+  padding: 1px 7px; line-height: 1.4;
+}
+.multiselect-caret { color: var(--ink-muted); font-size: 11px; }
+.multiselect-panel {
+  position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; min-width: 190px; max-height: 260px; overflow-y: auto;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+  padding: 8px;
+}
+.multiselect-option {
+  display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 6px; font-size: 13px; cursor: pointer; white-space: nowrap;
+}
+.multiselect-option:hover { background: var(--surface-sunken); }
+.multiselect-option input { width: 15px; height: 15px; accent-color: var(--accent); }
+
+/* ---- Barcode field with inline camera-icon scan ---- */
+.barcode-input-row { display: flex; gap: 8px; align-items: stretch; }
+.barcode-input-row input { flex: 1; }
+.barcode-scan-icon-btn {
+  flex: 0 0 auto; width: 40px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-sm);
+  cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;
+}
+.barcode-scan-icon-btn:hover { border-color: var(--accent); }
+
+/* ---- Cart line item detail grid (Invoice page) ---- */
+.line-item-row.detailed { grid-template-columns: repeat(7, 1fr) auto; }
+.line-item-cell { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.line-item-cell .cell-label { font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--ink-muted); }
+.line-item-cell .cell-value { font-weight: 600; overflow-wrap: break-word; }
+
+/* ---- Sub-menu (nav dropdown) ---- */
+.app-nav .nav-submenu-wrap { position: relative; }
+.app-nav .nav-submenu-trigger {
+  background: transparent; border: none; cursor: pointer; font: inherit; color: var(--ink-muted);
+  font-size: 20px; font-weight: 600; padding: 12px 0; letter-spacing: 0.02em; border-bottom: 3px solid transparent;
+  display: flex; align-items: center; gap: 6px;
+}
+.app-nav .nav-submenu-trigger:hover { color: var(--accent-dark); }
+.app-nav .nav-submenu-trigger.active { color: var(--accent-dark); border-bottom-color: var(--accent); }
+.nav-submenu-panel {
+  position: absolute; top: 100%; left: 0; z-index: 30; min-width: 190px;
+  background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-sm); box-shadow: var(--shadow-md);
+  padding: 6px; margin-top: 4px;
+}
+.nav-submenu-panel a {
+  display: block; padding: 10px 12px; font-size: 14px; font-weight: 600; color: var(--ink); text-decoration: none; border-radius: 6px;
+}
+.nav-submenu-panel a:hover { background: var(--surface-sunken); }
+.nav-submenu-panel a.active { color: var(--accent-dark); background: var(--accent-tint); }
+.app-nav-mobile .nav-submenu-group { display: flex; flex-direction: column; }
+.app-nav-mobile .nav-submenu-heading { padding: 12px 14px 2px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--ink-muted); }
+.app-nav-mobile .nav-submenu-group a { padding-left: 28px; }
+
 /* ---- Pagination controls ---- */
 .pagination-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 14px; flex-wrap: wrap; }
 .pagination-bar select { width: auto; }
@@ -312,6 +382,7 @@ table.data-table.excel-table tbody tr:hover td {
   .brand img.logo { height: 40px; }
   .brand .shop-name { font-size: 44px; }
   .line-item-row { grid-template-columns: 1fr 1fr; }
+  .line-item-row.detailed { grid-template-columns: 1fr 1fr 1fr; }
   .chart-with-table { grid-template-columns: 1fr; }
   /* keep user block items left-aligned on smaller screens to avoid overflow */
   .user-block { align-items: flex-start; }
@@ -323,6 +394,7 @@ table.data-table.excel-table tbody tr:hover td {
   .field-grid { grid-template-columns: 1fr; }
   .panel { padding: 16px; }
   .line-item-row { grid-template-columns: 1fr; }
+  .line-item-row.detailed { grid-template-columns: 1fr 1fr; }
   table.data-table { font-size: 12.5px; }
   .brand .shop-name { font-size: 34px; }
   .app-header-row { align-items: center; }

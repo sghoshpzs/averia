@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import shopConfig from '../config/shopConfig';
 import { subscribeSales } from '../utils/firestoreHelpers';
 import { calcProfit, formatCurrency } from '../utils/calculations';
+import DateFilter, { useDateFilterState } from '../components/DateFilter';
 
 const COLORS = ['#1f5fb5', '#c19a5a', '#1f7a5e', '#8a6fae', '#c92d39', '#3f6b8a'];
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
@@ -12,7 +13,7 @@ function LinkToggle({ options, value, onChange }) {
     <span className="link-toggle-group">
       {options.map((opt, i) => (
         <span key={opt.value} style={{ display: 'inline-flex', alignItems: 'center' }}>
-          {i > 0 && <span className="link-toggle-sep">/</span>}
+          {i > 0 && <span className="link-toggle-sep">|</span>}
           <a
             className={`link-toggle${value === opt.value ? ' active' : ''}`}
             onClick={() => onChange(opt.value)}
@@ -28,8 +29,8 @@ function LinkToggle({ options, value, onChange }) {
 export default function SalesSummaryPage() {
   const [sales, setSales] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const dateFilter = useDateFilterState();
   const [chartGroupBy, setChartGroupBy] = useState('category'); // 'category' | 'vendor'
-  const [chartType, setChartType] = useState('pie'); // 'pie' | 'bar'
   const [sideTableGroupBy, setSideTableGroupBy] = useState('type'); // 'type' | 'vendor'
   const [columnFilters, setColumnFilters] = useState({});
   const [page, setPage] = useState(0);
@@ -38,8 +39,8 @@ export default function SalesSummaryPage() {
   useEffect(() => subscribeSales(setSales), []);
 
   const salesInScope = useMemo(
-    () => sales.filter((s) => categoryFilter === 'All' || s.category === categoryFilter),
-    [sales, categoryFilter]
+    () => sales.filter((s) => (categoryFilter === 'All' || s.category === categoryFilter) && dateFilter.matches(s.soldDateMillis)),
+    [sales, categoryFilter, dateFilter]
   );
 
   // ---- Top stats ----
@@ -137,13 +138,16 @@ export default function SalesSummaryPage() {
           </p>
         </div>
 
-        <div className="field-grid" style={{ maxWidth: 280, width: '100%', margin: 0 }}>
-          <div className="field">
-            <label>Category</label>
-            <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(0); }}>
-              <option value="All">All</option>
-              {shopConfig.categories.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
+          <DateFilter state={dateFilter} />
+          <div className="field-grid" style={{ maxWidth: 280, width: '100%', margin: 0 }}>
+            <div className="field">
+              <label>Category</label>
+              <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(0); }}>
+                <option value="All">All</option>
+                {shopConfig.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -170,12 +174,7 @@ export default function SalesSummaryPage() {
             <LinkToggle
               value={chartGroupBy}
               onChange={setChartGroupBy}
-              options={[{ value: 'category', label: 'By Category' }, { value: 'vendor', label: 'By Vendor' }]}
-            />
-            <LinkToggle
-              value={chartType}
-              onChange={setChartType}
-              options={[{ value: 'pie', label: 'Pie' }, { value: 'bar', label: 'Bar' }]}
+              options={[{ value: 'category', label: 'Category' }, { value: 'vendor', label: 'Vendor' }]}
             />
           </div>
         </div>
@@ -184,7 +183,7 @@ export default function SalesSummaryPage() {
           <div>
             {chartData.length === 0 ? (
               <p className="muted">No sales in this scope yet.</p>
-            ) : chartType === 'pie' ? (
+            ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie data={chartData} dataKey="sold" nameKey="label" outerRadius={110} label>
@@ -194,35 +193,26 @@ export default function SalesSummaryPage() {
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <XAxis dataKey="label" stroke="#5f738d" />
-                  <YAxis stroke="#5f738d" />
-                  <Tooltip formatter={(v) => formatCurrency(v)} />
-                  <Bar dataKey="sold" fill="#1f5fb5" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
             )}
           </div>
 
           <div className="side-table-wrap">
             <div className="panel-title-row" style={{ marginBottom: 8 }}>
               <h3 style={{ margin: 0 }}>
-                {categoryFilter === 'All' ? 'By Category' : `${categoryFilter} breakdown`}
+                {categoryFilter === 'All' ? 'Category' : `${categoryFilter} breakdown`}
               </h3>
               {categoryFilter !== 'All' && (
                 <LinkToggle
                   value={sideTableGroupBy}
                   onChange={setSideTableGroupBy}
-                  options={[{ value: 'type', label: 'By Sub-Category' }, { value: 'vendor', label: 'By Vendor' }]}
+                  options={[{ value: 'type', label: 'Type' }, { value: 'vendor', label: 'Vendor' }]}
                 />
               )}
             </div>
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>{categoryFilter === 'All' ? 'Category' : (sideTableGroupBy === 'type' ? 'Sub-Category' : 'Vendor')}</th>
+                  <th>{categoryFilter === 'All' ? 'Category' : (sideTableGroupBy === 'type' ? 'Type' : 'Vendor')}</th>
                   <th>Sold Amount</th>
                   <th>% Profit</th>
                 </tr>

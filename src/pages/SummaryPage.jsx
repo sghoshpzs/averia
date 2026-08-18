@@ -1,20 +1,21 @@
 import { useEffect, useMemo, useState } from 'react';
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import shopConfig from '../config/shopConfig';
 import { subscribeInventory, updateInventoryDoc, markPrinted } from '../utils/firestoreHelpers';
 import { calcPrintedPrice, formatCurrency } from '../utils/calculations';
+import DateFilter, { useDateFilterState } from '../components/DateFilter';
 
 const COLORS = ['#1f5fb5', '#c19a5a', '#1f7a5e', '#8a6fae', '#c92d39', '#3f6b8a'];
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
 
 // Small text-link toggle used for "only one view at a time, switched by
-// clicking a hyperlink" controls (chart grouping, chart type, side-table view).
+// clicking a hyperlink" controls (chart grouping, side-table view).
 function LinkToggle({ options, value, onChange }) {
   return (
     <span className="link-toggle-group">
       {options.map((opt, i) => (
         <span key={opt.value} style={{ display: 'inline-flex', alignItems: 'center' }}>
-          {i > 0 && <span className="link-toggle-sep">/</span>}
+          {i > 0 && <span className="link-toggle-sep">|</span>}
           <a
             className={`link-toggle${value === opt.value ? ' active' : ''}`}
             onClick={() => onChange(opt.value)}
@@ -30,8 +31,8 @@ function LinkToggle({ options, value, onChange }) {
 export default function SummaryPage() {
   const [rows, setRows] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('All');
+  const dateFilter = useDateFilterState();
   const [chartGroupBy, setChartGroupBy] = useState('category'); // 'category' | 'vendor'
-  const [chartType, setChartType] = useState('pie'); // 'pie' | 'bar'
   const [sideTableGroupBy, setSideTableGroupBy] = useState('type'); // 'type' | 'vendor' (only when a category is selected)
   const [columnFilters, setColumnFilters] = useState({});
   const [page, setPage] = useState(0);
@@ -40,12 +41,12 @@ export default function SummaryPage() {
   useEffect(() => subscribeInventory(setRows), []);
 
   const inventoryInScope = useMemo(
-    () => rows.filter((r) => categoryFilter === 'All' || r.category === categoryFilter),
-    [rows, categoryFilter]
+    () => rows.filter((r) => (categoryFilter === 'All' || r.category === categoryFilter) && dateFilter.matches(r.createdAtMillis)),
+    [rows, categoryFilter, dateFilter]
   );
 
-  // ---- Summary stats — purely inventory-derived, no date filtering, no
-  // profit (that lives on Sales Summary now) ----
+  // ---- Summary stats — inventory-derived, scoped by the date filter above;
+  // no profit here (that lives on Sales Summary instead) ----
   const totalInvested = inventoryInScope.reduce(
     (s, r) => s + (Number(r.cost) || 0) * (Number(r.quantityPurchased) || 1),
     0
@@ -178,13 +179,16 @@ export default function SummaryPage() {
           </p>
         </div>
 
-        <div className="field-grid" style={{ maxWidth: 280, width: '100%', margin: 0 }}>
-          <div className="field">
-            <label>Category</label>
-            <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(0); }}>
-              <option value="All">All</option>
-              {shopConfig.categories.map((c) => <option key={c} value={c}>{c}</option>)}
-            </select>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
+          <DateFilter state={dateFilter} />
+          <div className="field-grid" style={{ maxWidth: 280, width: '100%', margin: 0 }}>
+            <div className="field">
+              <label>Category</label>
+              <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(0); }}>
+                <option value="All">All</option>
+                {shopConfig.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
           </div>
         </div>
       </div>
@@ -211,12 +215,7 @@ export default function SummaryPage() {
             <LinkToggle
               value={chartGroupBy}
               onChange={setChartGroupBy}
-              options={[{ value: 'category', label: 'By Category' }, { value: 'vendor', label: 'By Vendor' }]}
-            />
-            <LinkToggle
-              value={chartType}
-              onChange={setChartType}
-              options={[{ value: 'pie', label: 'Pie' }, { value: 'bar', label: 'Bar' }]}
+              options={[{ value: 'category', label: 'Category' }, { value: 'vendor', label: 'Vendor' }]}
             />
           </div>
         </div>
@@ -225,7 +224,7 @@ export default function SummaryPage() {
           <div>
             {chartData.length === 0 ? (
               <p className="muted">No inventory in this scope yet.</p>
-            ) : chartType === 'pie' ? (
+            ) : (
               <ResponsiveContainer width="100%" height={300}>
                 <PieChart>
                   <Pie data={chartData} dataKey="invested" nameKey="label" outerRadius={110} label>
@@ -235,35 +234,26 @@ export default function SummaryPage() {
                   <Legend />
                 </PieChart>
               </ResponsiveContainer>
-            ) : (
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={chartData}>
-                  <XAxis dataKey="label" stroke="#5f738d" />
-                  <YAxis stroke="#5f738d" />
-                  <Tooltip formatter={(v) => formatCurrency(v)} />
-                  <Bar dataKey="invested" fill="#1f5fb5" radius={[4, 4, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer>
             )}
           </div>
 
           <div className="side-table-wrap">
             <div className="panel-title-row" style={{ marginBottom: 8 }}>
               <h3 style={{ margin: 0 }}>
-                {categoryFilter === 'All' ? 'By Category' : `${categoryFilter} breakdown`}
+                {categoryFilter === 'All' ? 'Category' : `${categoryFilter} breakdown`}
               </h3>
               {categoryFilter !== 'All' && (
                 <LinkToggle
                   value={sideTableGroupBy}
                   onChange={setSideTableGroupBy}
-                  options={[{ value: 'type', label: 'By Sub-Category' }, { value: 'vendor', label: 'By Vendor' }]}
+                  options={[{ value: 'type', label: 'Type' }, { value: 'vendor', label: 'Vendor' }]}
                 />
               )}
             </div>
             <table className="data-table">
               <thead>
                 <tr>
-                  <th>{categoryFilter === 'All' ? 'Category' : (sideTableGroupBy === 'type' ? 'Sub-Category' : 'Vendor')}</th>
+                  <th>{categoryFilter === 'All' ? 'Category' : (sideTableGroupBy === 'type' ? 'Type' : 'Vendor')}</th>
                   <th>Invested</th>
                 </tr>
               </thead>
@@ -347,7 +337,7 @@ export default function SummaryPage() {
                       return (
                         <td key={col.key}>
                           <input
-                            className="filter-input"
+                            className={`filter-input${col.key === 'name' ? ' plain' : ''}`}
                             style={{ marginTop: 0 }}
                             defaultValue={val}
                             onBlur={(e) => e.target.value !== String(val) && handleCellEdit(row, col.key, e.target.value)}

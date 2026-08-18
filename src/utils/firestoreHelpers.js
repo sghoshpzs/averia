@@ -10,7 +10,8 @@ import {
   getDocs,
   writeBatch,
   serverTimestamp,
-  runTransaction
+  runTransaction,
+  deleteDoc
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import shopConfig from '../config/shopConfig';
@@ -19,6 +20,7 @@ const inventoryCol = () => collection(db, shopConfig.collections.inventory);
 const customersCol = () => collection(db, shopConfig.collections.customers);
 const invoicesCol = () => collection(db, shopConfig.collections.invoices);
 const salesCol = () => collection(db, shopConfig.collections.sales);
+const expensesCol = () => collection(db, shopConfig.collections.expenses);
 
 // ---- Inventory --------------------------------------------------------
 
@@ -124,11 +126,19 @@ export function subscribeSales(callback) {
 // that one call fails is a customer's running total is slightly stale,
 // which is recoverable and non-destructive, unlike an inventory mismatch.
 //
+// Reserves a Firestore doc ID for an invoice without writing anything, so
+// the Invoice Id can be shown in the UI before checkout actually happens.
+// Pass the returned ID into checkoutInvoice() so the doc it writes lands
+// under this same ID instead of a freshly generated one.
+export function reserveInvoiceId() {
+  return doc(invoicesCol()).id;
+}
+
 // cartItems: [{ inventoryDoc, quantity, soldPricePerUnit }] — entries
 // without an inventoryDoc (manual/lookup-failed lines) are skipped for the
 // inventory/sales writes but still appear in the invoice's item list.
-export async function checkoutInvoice(cartItems, invoiceData) {
-  const invoiceRef = doc(invoicesCol());
+export async function checkoutInvoice(cartItems, invoiceData, invoiceId) {
+  const invoiceRef = invoiceId ? doc(db, shopConfig.collections.invoices, invoiceId) : doc(invoicesCol());
   const itemsWithInventory = cartItems.filter((i) => i.inventoryDoc);
 
   await runTransaction(db, async (tx) => {
@@ -273,4 +283,26 @@ export async function upsertCustomerOnPurchase({ name, phone, email, address }, 
 export async function createInvoiceRecord(invoiceData) {
   const ref = await addDoc(invoicesCol(), { ...invoiceData, createdAtMillis: Date.now() });
   return ref.id;
+}
+
+// ---- Ad-Hoc Expenses -------------------------------------------------------
+
+export function subscribeExpenses(callback) {
+  const q = query(expensesCol(), orderBy('dateMillis', 'desc'));
+  return onSnapshot(q, (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+}
+
+export async function addExpense({ category, description, amount, dateMillis }) {
+  const ref = await addDoc(expensesCol(), {
+    category,
+    description: description || '',
+    amount: Number(amount) || 0,
+    dateMillis,
+    createdAtMillis: Date.now()
+  });
+  return ref.id;
+}
+
+export async function deleteExpense(docId) {
+  await deleteDoc(doc(db, shopConfig.collections.expenses, docId));
 }
