@@ -69,16 +69,14 @@ export default function ExpensesPage() {
             Track shop overhead — rent, electricity, repairs, and other one-off costs.
           </p>
         </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
+        <div className="filter-bar-row">
           <DateFilter state={dateFilter} />
-          <div className="field-grid" style={{ maxWidth: 280, width: '100%', margin: 0 }}>
-            <div className="field">
-              <label>Category</label>
-              <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
-                <option value="All">All</option>
-                {shopConfig.expenseCategories.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
+          <div className="field" style={{ width: 170 }}>
+            <label>Category</label>
+            <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
+              <option value="All">All</option>
+              {shopConfig.expenseCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
         </div>
       </div>

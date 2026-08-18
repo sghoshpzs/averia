@@ -138,16 +138,14 @@ export default function SalesSummaryPage() {
           </p>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 10, alignItems: 'flex-end' }}>
+        <div className="filter-bar-row">
           <DateFilter state={dateFilter} />
-          <div className="field-grid" style={{ maxWidth: 280, width: '100%', margin: 0 }}>
-            <div className="field">
-              <label>Category</label>
-              <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(0); }}>
-                <option value="All">All</option>
-                {shopConfig.categories.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
-            </div>
+          <div className="field" style={{ width: 170 }}>
+            <label>Category</label>
+            <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(0); }}>
+              <option value="All">All</option>
+              {shopConfig.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
           </div>
         </div>
       </div>

@@ -76,7 +76,7 @@ a.link-toggle + a.link-toggle { margin-left: 14px; }
   z-index: 20;
 }
 .app-header-row {
-  display: flex; align-items: flex-end; justify-content: space-between;
+  display: flex; align-items: center; justify-content: space-between;
   padding: 24px 32px 18px;
   max-width: min(1600px, 100%);
   width: 100%;
@@ -87,6 +87,7 @@ a.link-toggle + a.link-toggle { margin-left: 14px; }
 .brand .shop-name { font-family: var(--font-brand); font-size: 68px; line-height: 0.9; letter-spacing: 0.02em; color: var(--accent-dark); font-weight: 700; }
 
 .app-nav { display: flex; gap: 20px; }
+.app-nav-desktop { margin-left: 48px; }
 .app-nav a {
   text-decoration: none; color: var(--ink-muted); font-size: 20px; font-weight: 600;
   padding: 12px 0; transition: color .15s ease, border-color .15s ease;
@@ -304,6 +305,9 @@ table.data-table.excel-table tbody tr:hover td {
 
 /* ---- Multi-select dropdown (date filter, etc.) ---- */
 .date-filter-bar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
+/* Top-level filter row (date filter + category filter) on Summary/Expense
+   pages — one line, dropdowns and the labeled select bottom-aligned. */
+.filter-bar-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
 .multiselect { position: relative; }
 .multiselect-trigger {
   display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--hairline);
@@ -372,7 +376,7 @@ table.data-table.excel-table tbody tr:hover td {
 
 /* ---- Responsive ---- */
 @media (max-width: 900px) {
-  .grid-3, .grid-2 { grid-template-columns: 1fr; }
+  .grid-2 { grid-template-columns: 1fr; }
   .field-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); }
   .app-nav-desktop { display: none; }
   .menu-toggle { display: flex; }
@@ -391,6 +395,7 @@ table.data-table.excel-table tbody tr:hover td {
 
 @media (max-width: 560px) {
   h1 { font-size: 22px; }
+  .grid-3 { grid-template-columns: 1fr; }
   .field-grid { grid-template-columns: 1fr; }
   .panel { padding: 16px; }
   .line-item-row { grid-template-columns: 1fr; }
