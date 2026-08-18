@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import shopConfig from '../config/shopConfig';
+import { generateRowId } from './calculations';
 
 const inventoryCol = () => collection(db, shopConfig.collections.inventory);
 const customersCol = () => collection(db, shopConfig.collections.customers);
@@ -126,12 +127,12 @@ export function subscribeSales(callback) {
 // that one call fails is a customer's running total is slightly stale,
 // which is recoverable and non-destructive, unlike an inventory mismatch.
 //
-// Reserves a Firestore doc ID for an invoice without writing anything, so
-// the Invoice Id can be shown in the UI before checkout actually happens.
-// Pass the returned ID into checkoutInvoice() so the doc it writes lands
-// under this same ID instead of a freshly generated one.
+// Reserves an 8-digit, timestamp-based invoice number (same scheme as
+// inventory row IDs) without writing anything, so the Invoice Id can be
+// shown in the UI before checkout actually happens. Pass the returned ID
+// into checkoutInvoice() so the doc it writes lands under this same ID.
 export function reserveInvoiceId() {
-  return doc(invoicesCol()).id;
+  return generateRowId();
 }
 
 // cartItems: [{ inventoryDoc, quantity, soldPricePerUnit }] — entries

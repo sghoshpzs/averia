@@ -308,6 +308,7 @@ table.data-table.excel-table tbody tr:hover td {
 /* Top-level filter row (date filter + category filter) on Summary/Expense
    pages — one line, dropdowns and the labeled select bottom-aligned. */
 .filter-bar-row { display: flex; gap: 12px; align-items: flex-end; flex-wrap: wrap; }
+.category-filter-field { width: 170px; }
 .multiselect { position: relative; }
 .multiselect-trigger {
   display: flex; align-items: center; gap: 6px; background: var(--surface); border: 1px solid var(--hairline);
@@ -395,12 +396,21 @@ table.data-table.excel-table tbody tr:hover td {
 
 @media (max-width: 560px) {
   h1 { font-size: 22px; }
-  .grid-3 { grid-template-columns: 1fr; }
+  .grid-3 { gap: 8px; }
+  .grid-3 .summary-stat { padding: 12px 10px; }
+  .grid-3 .summary-stat .value { font-size: 17px; }
+  .grid-3 .summary-stat .label { font-size: 9.5px; letter-spacing: 0.02em; }
   .field-grid { grid-template-columns: 1fr; }
   .panel { padding: 16px; }
   .line-item-row { grid-template-columns: 1fr; }
   .line-item-row.detailed { grid-template-columns: 1fr 1fr; }
   table.data-table { font-size: 12.5px; }
+  .filter-bar-row, .date-filter-bar { gap: 6px; }
+  .category-filter-field { width: 108px; }
+  .category-filter-field select { padding: 7px 8px; font-size: 12px; }
+  .multiselect-trigger { padding: 7px 8px; font-size: 11.5px; gap: 4px; }
+  .multiselect-count { display: none; }
+  .multiselect-caret { font-size: 9px; }
   .brand .shop-name { font-size: 34px; }
   .app-header-row { align-items: center; }
   .app-nav-mobile a { font-size: 14px; }

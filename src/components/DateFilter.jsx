@@ -25,9 +25,9 @@ export default function DateFilter({ state }) {
   const { selections, setFys, setMonths, setQuarters } = state;
   return (
     <div className="date-filter-bar">
-      <MultiSelectDropdown label="Financial Year" options={fyOptions()} selected={selections.fys} onChange={setFys} />
-      <MultiSelectDropdown label="Month" options={MONTH_OPTIONS} selected={selections.months} onChange={setMonths} />
-      <MultiSelectDropdown label="Quarter" options={QUARTER_OPTIONS} selected={selections.quarters} onChange={setQuarters} />
+      <MultiSelectDropdown label="FY" options={fyOptions()} selected={selections.fys} onChange={setFys} />
+      <MultiSelectDropdown label="Mon" options={MONTH_OPTIONS} selected={selections.months} onChange={setMonths} />
+      <MultiSelectDropdown label="Qtr" options={QUARTER_OPTIONS} selected={selections.quarters} onChange={setQuarters} />
     </div>
   );
 }

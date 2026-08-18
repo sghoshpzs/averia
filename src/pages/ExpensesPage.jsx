@@ -71,7 +71,7 @@ export default function ExpensesPage() {
         </div>
         <div className="filter-bar-row">
           <DateFilter state={dateFilter} />
-          <div className="field" style={{ width: 170 }}>
+          <div className="field category-filter-field">
             <label>Category</label>
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
               <option value="All">All</option>
