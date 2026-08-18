@@ -62,7 +62,7 @@ export async function addInventoryLot(baseRow, quantity, generateRowId, generate
     createdAtMillis: Date.now(),
     // kept null/absent on purpose — a lot doc represents many units, so a
     // single soldPrice/soldDate doesn't apply here. Per-unit sale info
-    // lives in the `sales` collection instead (see recordSale below).
+    // lives in the `sales` collection instead (see checkoutInvoice below).
     soldPrice: null,
     soldDate: null
   };
@@ -107,33 +107,93 @@ export function subscribeSales(callback) {
   return onSnapshot(q, (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
 }
 
-// Records the sale of `quantity` units (default 1) from the given inventory
-// doc, whether it's a lot or a uniquely-barcoded item, and returns the
-// created sale doc IDs. Uses a Firestore transaction for lot items so two
-// staff selling from the same lot at the same time can't oversell it.
-export async function recordSale(inventoryDoc, quantity, soldPricePerUnit, invoiceRef) {
-  const qty = Math.max(1, Number(quantity) || 1);
-  const invRef = doc(db, shopConfig.collections.inventory, inventoryDoc.id);
-  const saleIds = [];
+// Records every item in one checkout, AND the invoice doc itself, as a
+// SINGLE Firestore transaction: reads all referenced inventory docs first
+// (Firestore requires every read in a transaction to happen before any
+// write), validates lot quantities against every line item at once, then
+// commits the invoice + every inventory decrement/status update + every
+// sales doc together. If ANY item fails validation (e.g. a lot sold out
+// moments ago in a different checkout), NONE of it is written \u2014 there is
+// no state where an invoice exists without matching stock deduction, which
+// was the gap in the original sequential-await version.
+//
+// Customer upsert is intentionally NOT part of this transaction \u2014 it
+// requires a `where()` query read, and reading a query inside a web-SDK
+// transaction is not something to rely on for money-correctness-critical
+// code. It's called separately, right after this succeeds. Worst case if
+// that one call fails is a customer's running total is slightly stale,
+// which is recoverable and non-destructive, unlike an inventory mismatch.
+//
+// cartItems: [{ inventoryDoc, quantity, soldPricePerUnit }] — entries
+// without an inventoryDoc (manual/lookup-failed lines) are skipped for the
+// inventory/sales writes but still appear in the invoice's item list.
+export async function checkoutInvoice(cartItems, invoiceData) {
+  const invoiceRef = doc(invoicesCol());
+  const itemsWithInventory = cartItems.filter((i) => i.inventoryDoc);
 
-  if (inventoryDoc.isLot) {
-    await runTransaction(db, async (tx) => {
+  await runTransaction(db, async (tx) => {
+    // ---- READ PHASE — every tx.get() must happen before any tx.set/update ----
+    const resolved = [];
+    for (const item of itemsWithInventory) {
+      const invRef = doc(db, shopConfig.collections.inventory, item.inventoryDoc.id);
       const snap = await tx.get(invRef);
-      if (!snap.exists()) throw new Error('Inventory lot no longer exists.');
-      const data = snap.data();
-      const remaining = Number(data.quantityRemaining) || 0;
-      if (remaining < qty) {
-        throw new Error(`Only ${remaining} unit(s) left in this lot \u2014 reduce the quantity.`);
+      if (!snap.exists()) {
+        throw new Error(`${item.inventoryDoc.rowId || item.inventoryDoc.id} no longer exists in inventory.`);
       }
-      const nextRemaining = remaining - qty;
-      tx.update(invRef, {
-        quantityRemaining: nextRemaining,
-        status: nextRemaining === 0 ? 'Sold' : data.status
-      });
-      for (let i = 0; i < qty; i++) {
+      resolved.push({ item, invRef, data: snap.data() });
+    }
+
+    // ---- VALIDATE PHASE — check every line before writing any of them ----
+    resolved.forEach(({ item, data }) => {
+      const qty = Math.max(1, Number(item.quantity) || 1);
+      if (data.isLot) {
+        const remaining = Number(data.quantityRemaining) || 0;
+        if (remaining < qty) {
+          throw new Error(`Only ${remaining} unit(s) left of ${data.rowId} (${data.name || data.type}) \u2014 reduce the quantity and try again.`);
+        }
+      } else if (data.status === 'Sold') {
+        throw new Error(`${data.rowId} (${data.name || data.type}) was already sold \u2014 remove it from the cart.`);
+      }
+    });
+
+    // ---- WRITE PHASE ----
+    tx.set(invoiceRef, { ...invoiceData, createdAtMillis: Date.now() });
+
+    resolved.forEach(({ item, invRef, data }) => {
+      const qty = Math.max(1, Number(item.quantity) || 1);
+      const soldPricePerUnit = item.soldPricePerUnit;
+
+      if (data.isLot) {
+        const nextRemaining = (Number(data.quantityRemaining) || 0) - qty;
+        tx.update(invRef, {
+          quantityRemaining: nextRemaining,
+          status: nextRemaining === 0 ? 'Sold' : data.status
+        });
+        for (let i = 0; i < qty; i++) {
+          const saleRef = doc(salesCol());
+          tx.set(saleRef, {
+            inventoryDocId: item.inventoryDoc.id,
+            rowId: data.rowId,
+            category: data.category,
+            type: data.type,
+            name: data.name,
+            cost: data.cost,
+            soldPrice: soldPricePerUnit,
+            soldDate: serverTimestamp(),
+            soldDateMillis: Date.now(),
+            invoiceRef: invoiceRef.id
+          });
+        }
+      } else {
+        tx.update(invRef, {
+          status: 'Sold',
+          soldPrice: soldPricePerUnit,
+          soldDate: serverTimestamp(),
+          soldDateMillis: Date.now()
+        });
         const saleRef = doc(salesCol());
         tx.set(saleRef, {
-          inventoryDocId: inventoryDoc.id,
+          inventoryDocId: item.inventoryDoc.id,
           rowId: data.rowId,
           category: data.category,
           type: data.type,
@@ -142,31 +202,13 @@ export async function recordSale(inventoryDoc, quantity, soldPricePerUnit, invoi
           soldPrice: soldPricePerUnit,
           soldDate: serverTimestamp(),
           soldDateMillis: Date.now(),
-          invoiceRef: invoiceRef || null
+          invoiceRef: invoiceRef.id
         });
-        saleIds.push(saleRef.id);
       }
     });
-    return saleIds;
-  }
-
-  // Non-lot: one physical item, one sale. Still mark the inventory doc
-  // itself (existing behavior other tooling/exports may rely on) AND write
-  // a sales record so Summary can read every sale from one place.
-  await markSold(inventoryDoc.id, soldPricePerUnit);
-  const saleRef = await addDoc(salesCol(), {
-    inventoryDocId: inventoryDoc.id,
-    rowId: inventoryDoc.rowId,
-    category: inventoryDoc.category,
-    type: inventoryDoc.type,
-    name: inventoryDoc.name,
-    cost: inventoryDoc.cost,
-    soldPrice: soldPricePerUnit,
-    soldDate: serverTimestamp(),
-    soldDateMillis: Date.now(),
-    invoiceRef: invoiceRef || null
   });
-  return [saleRef.id];
+
+  return invoiceRef.id;
 }
 
 export async function markPrinted(docIds) {
@@ -207,7 +249,10 @@ export async function upsertCustomerOnPurchase({ name, phone, email, address }, 
 }
 
 // ---- Invoices -------------------------------------------------------------
-
+// createInvoiceRecord is superseded by checkoutInvoice above (which writes
+// the invoice doc as part of the same atomic transaction as the inventory
+// deduction) — kept here only in case some other tooling wants to write an
+// invoice-shaped doc without touching inventory at all.
 export async function createInvoiceRecord(invoiceData) {
   const ref = await addDoc(invoicesCol(), { ...invoiceData, createdAtMillis: Date.now() });
   return ref.id;

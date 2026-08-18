@@ -4,7 +4,7 @@ import shopConfig from '../config/shopConfig';
 import ConfigField from '../components/ConfigField';
 import BarcodeScanner from '../components/BarcodeScanner';
 import { calcFinalPrice, formatCurrency } from '../utils/calculations';
-import { findInventoryByRowId, recordSale, createInvoiceRecord, upsertCustomerOnPurchase } from '../utils/firestoreHelpers';
+import { findInventoryByRowId, checkoutInvoice, upsertCustomerOnPurchase } from '../utils/firestoreHelpers';
 import { functions } from '../firebase';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -137,27 +137,28 @@ export default function InvoicePage() {
         quantity: Number(i.quantity) || 1
       }));
 
-      // 1. create invoice record
-      const invoiceId = await createInvoiceRecord({
-        items: invoiceItems,
-        total: cartTotal,
-        customerName,
-        customerPhone,
-        onlinePurchase,
-        address: onlinePurchase ? address : null,
-        paymentMode
-      });
-
-      // 2. record each sale: decrements lot quantityRemaining (transaction-
-      // safe) or marks a unique item Sold, and writes a permanent sales
-      // record either way so per-sale date/price is never overwritten.
-      await Promise.all(
-        items
-          .filter((i) => i.inventoryDoc)
-          .map((i) => recordSale(i.inventoryDoc, i.quantity, Number(i.finalPrice), invoiceId))
+      // 1+2. Invoice doc + inventory decrement/status + sales records all
+      // commit as ONE atomic transaction — either all of it happens or
+      // none of it does, so a failed line item (e.g. a lot sold out a
+      // second ago) can never leave behind an invoice with no matching
+      // stock deduction.
+      const invoiceId = await checkoutInvoice(
+        items.map((i) => ({ inventoryDoc: i.inventoryDoc, quantity: i.quantity, soldPricePerUnit: Number(i.finalPrice) })),
+        {
+          items: invoiceItems,
+          total: cartTotal,
+          customerName,
+          customerPhone,
+          onlinePurchase,
+          address: onlinePurchase ? address : null,
+          paymentMode
+        }
       );
 
-      // 3. upsert customer record
+      // 3. upsert customer record — deliberately outside the transaction
+      // above (see checkoutInvoice's comment for why). If this one call
+      // fails, the sale/inventory are still correct; only the customer's
+      // running total would need a manual nudge.
       await upsertCustomerOnPurchase(
         { name: customerName, phone: customerPhone, email: customerEmail || null, address: onlinePurchase ? address : null },
         cartTotal,
