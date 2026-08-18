@@ -289,7 +289,7 @@ export default function SalesSummaryPage() {
         </div>
 
         <div className="pagination-bar">
-          <div className="field" style={{ maxWidth: 160 }}>
+          <div className="field rows-per-page-field">
             <label>Rows per page</label>
             <select value={pageSize} onChange={(e) => { setPageSize(Number(e.target.value)); setPage(0); }}>
               {PAGE_SIZE_OPTIONS.map((n) => <option key={n} value={n}>{n}</option>)}
