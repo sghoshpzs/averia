@@ -7,6 +7,7 @@ A lightweight single-page React application for managing a small jewellery shop:
 ## Table of contents
 
 - [Features](#features)
+- [Screenshots](#screenshots)
 - [Tech stack](#tech-stack)
 - [Prerequisites](#prerequisites)
 - [Quick start](#quick-start)
@@ -29,6 +30,20 @@ A lightweight single-page React application for managing a small jewellery shop:
 - Create invoices, apply discounts and generate/send PDFs via Cloud Functions.
 - Customers list with WhatsApp messaging integration (Twilio).
 - Responsive layout and simple admin UI for shop configuration.
+
+## Screenshots
+
+| Inventory intake | Invoice / checkout |
+| --- | --- |
+| ![Inventory intake form](docs/screenshots/inventory.png) | ![Invoice barcode lookup and checkout](docs/screenshots/invoice.png) |
+
+| Inventory Summary | Sales Summary |
+| --- | --- |
+| ![Inventory Summary with invested-amount chart](docs/screenshots/inventory-summary.png) | ![Sales Summary with revenue and profit chart](docs/screenshots/sales-summary.png) |
+
+| Ad-Hoc Expenses | Customers |
+| --- | --- |
+| ![Ad-Hoc Expenses table with bulk delete](docs/screenshots/ad-hoc-expenses.png) | ![Customers list with WhatsApp marketing](docs/screenshots/customers.png) |
 
 ## Tech stack
 
@@ -100,6 +115,7 @@ To change allowed admin/worker users, set the environment variables in `.env`:
 
 - VITE_ALLOWED_ADMINS (comma separated emails)
 - VITE_ALLOWED_WORKERS (comma separated emails)
+- VITE_SUPER_USER (single email) — the only account that can bulk-delete rows on Inventory Summary and Ad-Hoc Expenses; must also appear in VITE_ALLOWED_ADMINS to sign in at all
 
 ## Development & build
 
@@ -130,14 +146,5 @@ Edit `functions/templates/invoiceTemplate.js`. The template receives a `pdfkit` 
 
 ## License
 
-MIT — see LICENSE file.
-
----
-
-If you want, I can also:
-
-- Add usage examples/screenshots to the README.
-- Add a `Makefile` / npm scripts for common tasks (emulator start, deploy shorthand).
-- Insert CI workflows for build and linting.
-
+MIT — see [LICENSE](LICENSE).
 
