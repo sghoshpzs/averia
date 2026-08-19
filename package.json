@@ -10,12 +10,16 @@
     "deploy": "npm run build && firebase deploy --only hosting"
   },
   "dependencies": {
+    "csv-parse": "^7.0.2",
     "firebase": "^12.17.1",
+    "firebase-admin": "^14.2.0",
+    "fs": "^0.0.1-security",
     "html5-qrcode": "^2.3.8",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
     "react-router-dom": "^6.27.0",
-    "recharts": "^2.13.0"
+    "recharts": "^2.13.0",
+    "require": "^2.4.20"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.2",

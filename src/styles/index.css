@@ -176,6 +176,8 @@ a.link-toggle + a.link-toggle { margin-left: 14px; }
 .btn-secondary:disabled { opacity: 0.45; cursor: not-allowed; }
 .btn-danger { background: var(--danger-tint); color: var(--danger); border-color: #f0c9c4; }
 .btn-danger:hover { background: #f6dcd8; }
+.btn-danger:disabled { opacity: 0.45; cursor: not-allowed; }
+.btn-danger:disabled:hover { background: var(--danger-tint); }
 
 /* ---- Tables ---- */
 table.data-table { width: 100%; border-collapse: collapse; font-size: 13.5px; }

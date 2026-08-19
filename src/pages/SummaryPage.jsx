@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import shopConfig from '../config/shopConfig';
-import { subscribeInventory, updateInventoryDoc, markPrinted } from '../utils/firestoreHelpers';
+import { subscribeInventory, updateInventoryDoc, markPrinted, deleteInventoryDocs } from '../utils/firestoreHelpers';
 import { calcPrintedPrice, formatCurrency } from '../utils/calculations';
+import { isSuperUser } from '../utils/auth';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
 
 const COLORS = ['#1f5fb5', '#c19a5a', '#1f7a5e', '#8a6fae', '#c92d39', '#3f6b8a'];
@@ -37,6 +38,9 @@ export default function SummaryPage() {
   const [columnFilters, setColumnFilters] = useState({});
   const [page, setPage] = useState(0);
   const [pageSize, setPageSize] = useState(10);
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const canDelete = isSuperUser();
 
   useEffect(() => subscribeInventory(setRows), []);
 
@@ -138,6 +142,40 @@ export default function SummaryPage() {
   useEffect(() => {
     if (page > totalPages - 1) setPage(Math.max(0, totalPages - 1));
   }, [totalPages, page]);
+
+  const allOnPageSelected = pagedRows.length > 0 && pagedRows.every((r) => selectedIds.has(r.id));
+
+  function toggleRow(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAllOnPage() {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allOnPageSelected) {
+        pagedRows.forEach((r) => next.delete(r.id));
+      } else {
+        pagedRows.forEach((r) => next.add(r.id));
+      }
+      return next;
+    });
+  }
+
+  async function handleDeleteSelected() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} selected inventory row(s)? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await deleteInventoryDocs([...selectedIds]);
+      setSelectedIds(new Set());
+    } finally {
+      setDeleting(false);
+    }
+  }
 
   async function handleCellEdit(row, colKey, newValue) {
     const patch = { [colKey]: colKey === 'name' ? newValue : Number(newValue) };
@@ -271,9 +309,21 @@ export default function SummaryPage() {
       <div className="panel">
         <div className="panel-title-row">
           <h2>Inventory Detail ({detailRows.length})</h2>
-          <button type="button" className="btn btn-secondary" onClick={handlePrintCsv} disabled={detailRows.length === 0}>
-            Print CSV
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button type="button" className="btn btn-secondary" onClick={handlePrintCsv} disabled={detailRows.length === 0}>
+              Print CSV
+            </button>
+            {selectedIds.size > 0 && <span className="muted">{selectedIds.size} selected</span>}
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={handleDeleteSelected}
+              disabled={!canDelete || selectedIds.size === 0 || deleting}
+              title={canDelete ? undefined : 'Only the super user account can delete inventory.'}
+            >
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          </div>
         </div>
         <p className="muted" style={{ marginTop: -8, marginBottom: 12 }}>
           Rows with a gold "lot" badge share one barcode across multiple units.
@@ -282,6 +332,7 @@ export default function SummaryPage() {
           <table className="data-table wide excel-table">
             <thead>
               <tr>
+                <th><input type="checkbox" checked={allOnPageSelected} onChange={toggleSelectAllOnPage} /></th>
                 {shopConfig.inventoryListColumns.map((col) => (
                   <th key={col.key}>
                     {col.label}
@@ -305,6 +356,7 @@ export default function SummaryPage() {
             <tbody>
               {pagedRows.map((row) => (
                 <tr key={row.id}>
+                  <td><input type="checkbox" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} /></td>
                   {shopConfig.inventoryListColumns.map((col) => {
                     const editable = col.editable;
                     const val = row[col.key];
@@ -348,7 +400,7 @@ export default function SummaryPage() {
                 </tr>
               ))}
               {pagedRows.length === 0 && (
-                <tr><td colSpan={shopConfig.inventoryListColumns.length} className="muted">No rows match the current filters.</td></tr>
+                <tr><td colSpan={shopConfig.inventoryListColumns.length + 1} className="muted">No rows match the current filters.</td></tr>
               )}
             </tbody>
           </table>

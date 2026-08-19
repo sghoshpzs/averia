@@ -15,6 +15,16 @@
 // from `sales`, not from fields on the inventory doc. Skipping this step
 // would make historical sales invisible in Summary after migration.
 //
+// ---- Category / Vendor / Type spelling ----
+// The Category, Vendor, and Type filter dropdowns on the Summary pages are
+// driven by fixed lists in src/config/shopConfig.js (`categories`, `vendors`,
+// `types`), NOT by whatever values happen to exist in Firestore. A migrated
+// row whose Category/Vendor/Type text doesn't match shopConfig.js exactly
+// (case-sensitive) will still import fine and show up in the unfiltered
+// table, but it won't be selectable from those dropdown filters. Check your
+// sheet's values against shopConfig.js before running for real — current
+// categories: Necklace, Bracelet, Ring, Earring, Bangle, Anklet.
+//
 // ---- Setup ----
 // 1. npm install firebase-admin csv-parse   (run inside this scripts/ folder,
 //    or add both to the root package.json devDependencies)
@@ -34,7 +44,10 @@
 const fs = require('fs');
 const path = require('path');
 const { parse } = require('csv-parse/sync');
-const admin = require('firebase-admin');
+// firebase-admin v12+ dropped the old admin.credential.cert()/admin.firestore()
+// namespace API in favor of these modular imports.
+const { cert, initializeApp } = require('firebase-admin/app');
+const { getFirestore, Timestamp, FieldValue } = require('firebase-admin/firestore');
 
 const DRY_RUN = process.argv.includes('--dry-run');
 const CSV_PATH = path.join(__dirname, 'inventory-export.csv');
@@ -72,6 +85,21 @@ function parseDateToMillis(v) {
   return isNaN(d.getTime()) ? null : d.getTime();
 }
 
+// Must match shopConfig.js's `statuses` list exactly — the inventory Status
+// filter dropdown and the checkout re-sale guard (`data.status === 'Sold'`)
+// both do exact, case-sensitive comparisons against these values.
+const VALID_STATUSES = ['Purchased', 'Printed', 'Sold'];
+
+// Sold items ALWAYS normalize to 'Sold', regardless of the sheet's spelling
+// ("sold", "SOLD", etc.) — a mismatched case here would let InvoicePage sell
+// an already-sold item a second time, since the re-sale guard is exact-match.
+function normalizeStatus(raw, isSold) {
+  if (isSold) return 'Sold';
+  const trimmed = String(raw || '').trim();
+  const match = VALID_STATUSES.find((s) => s.toLowerCase() === trimmed.toLowerCase());
+  return match || 'Purchased';
+}
+
 async function main() {
   if (!fs.existsSync(CSV_PATH)) {
     console.error(`Missing ${CSV_PATH} — export your sheet as CSV and save it there first.`);
@@ -88,13 +116,14 @@ async function main() {
       console.error(`Missing ${SERVICE_ACCOUNT_PATH} — see the setup notes at the top of this file.`);
       process.exit(1);
     }
-    admin.initializeApp({ credential: admin.credential.cert(require(SERVICE_ACCOUNT_PATH)) });
-    db = admin.firestore();
+    initializeApp({ credential: cert(require(SERVICE_ACCOUNT_PATH)) });
+    db = getFirestore();
   }
 
   let inventoryWrites = 0;
   let salesWrites = 0;
   let skipped = 0;
+  let statusNormalized = 0;
 
   const inventoryBatchOps = [];
   const salesBatchOps = [];
@@ -111,9 +140,13 @@ async function main() {
     const boxPrice = parseMoney(record[COLUMN_MAP.boxPrice]);
     const printedPrice = parseMoney(record[COLUMN_MAP.printedPrice]) || (cost + cost * (profitPercent / 100) + boxPrice);
     const soldPrice = parseMoney(record[COLUMN_MAP.soldPrice]);
-    const status = (record[COLUMN_MAP.status] || 'Purchased').trim();
+    const rawStatus = String(record[COLUMN_MAP.status] || '').trim();
     const createdMillis = parseDateToMillis(record[COLUMN_MAP.created]) || Date.now();
     const soldDateMillis = parseDateToMillis(record[COLUMN_MAP.soldDate]);
+
+    const isSold = rawStatus.toLowerCase() === 'sold' || (soldPrice > 0 && soldDateMillis);
+    const status = normalizeStatus(rawStatus, isSold);
+    if (status !== rawStatus && !(isSold && rawStatus.toLowerCase() === 'sold')) statusNormalized++;
 
     const inventoryDoc = {
       rowId: String(rowId),
@@ -130,11 +163,9 @@ async function main() {
       status,
       createdAtMillis: createdMillis,
       soldPrice: soldPrice || null,
-      soldDate: soldDateMillis ? admin.firestore.Timestamp.fromMillis(soldDateMillis) : null,
+      soldDate: soldDateMillis ? Timestamp.fromMillis(soldDateMillis) : null,
       soldDateMillis: soldDateMillis || null
     };
-
-    const isSold = status.toLowerCase() === 'sold' || (soldPrice > 0 && soldDateMillis);
 
     if (DRY_RUN) {
       console.log(`[dry-run] inventory: ${inventoryDoc.rowId} (${inventoryDoc.category}/${inventoryDoc.type}) status=${status}${isSold ? ' + sales record' : ''}`);
@@ -152,16 +183,31 @@ async function main() {
       salesBatchOps.push({
         ref: saleRef,
         data: {
+          // Field set mirrors checkoutInvoice()'s sales docs (see
+          // src/utils/firestoreHelpers.js) so the Sales Summary table's
+          // columns — customer, payment mode, discount, etc. — don't come
+          // up blank for migrated historical rows. None of these are
+          // required for the app to function; they're display-only.
           inventoryDocId: invRef.id,
           rowId: inventoryDoc.rowId,
           category: inventoryDoc.category,
           type: inventoryDoc.type,
+          vendor: inventoryDoc.vendor || null,
           name: inventoryDoc.name,
           cost: inventoryDoc.cost,
+          printedPrice: inventoryDoc.printedPrice ?? null,
+          discountPercent: 0,
+          quantity: 1,
           soldPrice: soldPrice || printedPrice,
-          soldDate: soldDateMillis ? admin.firestore.Timestamp.fromMillis(soldDateMillis) : admin.firestore.FieldValue.serverTimestamp(),
+          soldDate: soldDateMillis ? Timestamp.fromMillis(soldDateMillis) : FieldValue.serverTimestamp(),
           soldDateMillis: soldDateMillis || Date.now(),
+          invoiceId: null,
           invoiceRef: null,
+          customerName: null,
+          customerPhone: null,
+          customerEmail: null,
+          onlinePurchase: false,
+          paymentMode: null,
           migratedFromSheet: true
         }
       });
@@ -184,6 +230,7 @@ async function main() {
   console.log(`Inventory docs: ${inventoryWrites}`);
   console.log(`Sales docs (from already-sold rows): ${salesWrites}`);
   console.log(`Skipped rows (missing Row ID): ${skipped}`);
+  console.log(`Status values normalized to match shopConfig.js (Purchased/Printed/Sold): ${statusNormalized}`);
   if (DRY_RUN) console.log('\nThis was a dry run — nothing was written. Re-run without --dry-run to commit.');
 }
 

@@ -10,8 +10,7 @@ import {
   getDocs,
   writeBatch,
   serverTimestamp,
-  runTransaction,
-  deleteDoc
+  runTransaction
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import shopConfig from '../config/shopConfig';
@@ -245,6 +244,16 @@ export async function markPrinted(docIds) {
   await batch.commit();
 }
 
+// Firestore batches cap at 500 writes — chunk deletes the same way the
+// migration script chunks its writes.
+export async function deleteInventoryDocs(docIds) {
+  for (let i = 0; i < docIds.length; i += 450) {
+    const batch = writeBatch(db);
+    docIds.slice(i, i + 450).forEach((id) => batch.delete(doc(db, shopConfig.collections.inventory, id)));
+    await batch.commit();
+  }
+}
+
 // ---- Customers ----------------------------------------------------------
 
 export function subscribeCustomers(callback) {
@@ -304,6 +313,10 @@ export async function addExpense({ category, description, amount, dateMillis }) 
   return ref.id;
 }
 
-export async function deleteExpense(docId) {
-  await deleteDoc(doc(db, shopConfig.collections.expenses, docId));
+export async function deleteExpenses(docIds) {
+  for (let i = 0; i < docIds.length; i += 450) {
+    const batch = writeBatch(db);
+    docIds.slice(i, i + 450).forEach((id) => batch.delete(doc(db, shopConfig.collections.expenses, id)));
+    await batch.commit();
+  }
 }

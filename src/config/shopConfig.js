@@ -32,7 +32,7 @@ const shopConfig = {
   // Invoice, and the Summary filter. Every item is stored in a single
   // Firestore collection ("inventory") with a `category` field — this
   // array just drives the dropdown, it does not create new collections.
-  categories: ['Necklace', 'Bracelet', 'Ring', 'Earring', 'Bangle', 'Anklet'],
+  categories: ['Necklace', 'Bracelet', 'Ring', 'Earring', 'Earring', 'Bangle', 'Anklet', 'Tikli'],
 
   // ---- Lot tracking ------------------------------------------------------
   // Categories listed here skip individual barcodes. Instead of creating
@@ -46,16 +46,16 @@ const shopConfig = {
   // physical piece isn't practical. Leave a category out of this list to
   // keep the original one-barcode-per-piece behavior (better for higher
   // value pieces you want individually traceable, e.g. necklaces).
-  lotTrackedCategories: ['Ring', 'Earring'],
+  lotTrackedCategories: ['Necklace', 'Bracelet', 'Ring', 'Earring', 'Bangle', 'Anklet', 'Tikli'],
 
   // ---- Type dropdown, scoped per category ------------------------------
   // Key = category name, Value = list of type options for that category.
   // Add a `_default` key to fall back on when a category isn't listed.
   types: {
-    Necklace: ['AD', 'Kundan', 'Temple', 'Beaded', 'Chain'],
-    Bracelet: ['Cuff', 'Chain', 'Beaded', 'Charm'],
+    Necklace: ['AD', 'Kundan', 'Temple', 'Beaded', 'Chain', 'Glass Stone', 'Silver Replica', 'Jarawa', 'Anti Tarnish'],
+    Bracelet: ['Cuff', 'Chain', 'Beaded', 'Charm', 'Jarawa',  'AD', 'Anti Tarnish', 'Glass Stone', 'Jarawa'],
     Ring: ['Solitaire', 'Band', 'Cocktail', 'Stackable'],
-    Earring: ['Stud', 'Hoop', 'Jhumka', 'Danglers'],
+    Earring: ['Stud', 'Hoop', 'Jhumka', 'Danglers',  'AD', 'Anti Tarnish'],
     Bangle: ['Classic', 'Kada', 'Cuff'],
     Anklet: ['Chain', 'Beaded'],
     _default: ['General']
@@ -64,13 +64,19 @@ const shopConfig = {
   // ---- Vendors -----------------------------------------------------------
   vendors: [
     'Being Women Malaysian',
+    'Perfect Jewel Jaipur',
+    'Jewel Wala',
+    'Decent Jewellers',
+    'Zaveri',
+    'Fancy Jewel Delhi',
     'Rajwada Ethnic',
-    'Sunrise Exports',
-    'Local Artisan'
+    'Delhi',
+    'Kolkata-6',
+    'Kolkata-c-25'
   ],
 
   // ---- Payment modes (Invoice page) --------------------------------------
-  paymentModes: ['Cash', 'UPI', 'Card'],
+  paymentModes: ['Cash', 'UPI'],
 
   // ---- Defaults -----------------------------------------------------------
   defaults: {
@@ -149,10 +155,10 @@ const shopConfig = {
 
   yesNo: ['Yes', 'No'],
 
-  statuses: ['Purchased', 'Printed', 'Sold'],
+  statuses: ['In-Stock', 'Printed', 'Sold'],
 
   // ---- Ad-Hoc Expenses -----------------------------------------------
-  expenseCategories: ['Rent', 'Electricity Bill', 'Repair Work', 'Other'],
+  expenseCategories: ['Rent', 'Electricity Bill', 'Repair Work', 'Online Promotion', 'Decoration', 'Accessories',  'Other'],
 
   expenseColumns: [
     { key: 'date', label: 'Date', filter: 'date' },

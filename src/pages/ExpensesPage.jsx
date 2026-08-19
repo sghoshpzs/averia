@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import shopConfig from '../config/shopConfig';
-import { subscribeExpenses, addExpense, deleteExpense } from '../utils/firestoreHelpers';
+import { subscribeExpenses, addExpense, deleteExpenses } from '../utils/firestoreHelpers';
 import { formatCurrency } from '../utils/calculations';
+import { isSuperUser } from '../utils/auth';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
 
 function todayInputValue() {
@@ -22,6 +23,9 @@ export default function ExpensesPage() {
   const [message, setMessage] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const dateFilter = useDateFilterState();
+  const [selectedIds, setSelectedIds] = useState(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const canDelete = isSuperUser();
 
   useEffect(() => subscribeExpenses(setExpenses), []);
 
@@ -31,6 +35,29 @@ export default function ExpensesPage() {
   );
 
   const totalCost = expensesInScope.reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
+
+  const allOnScreenSelected = expensesInScope.length > 0 && expensesInScope.every((e) => selectedIds.has(e.id));
+
+  function toggleRow(id) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleSelectAll() {
+    setSelectedIds((prev) => {
+      if (allOnScreenSelected) {
+        const next = new Set(prev);
+        expensesInScope.forEach((e) => next.delete(e.id));
+        return next;
+      }
+      const next = new Set(prev);
+      expensesInScope.forEach((e) => next.add(e.id));
+      return next;
+    });
+  }
 
   async function handleSubmit(e) {
     e.preventDefault();
@@ -56,8 +83,16 @@ export default function ExpensesPage() {
     }
   }
 
-  async function handleDelete(id) {
-    await deleteExpense(id);
+  async function handleDeleteSelected() {
+    if (selectedIds.size === 0) return;
+    if (!window.confirm(`Delete ${selectedIds.size} selected expense(s)? This cannot be undone.`)) return;
+    setDeleting(true);
+    try {
+      await deleteExpenses([...selectedIds]);
+      setSelectedIds(new Set());
+    } finally {
+      setDeleting(false);
+    }
   }
 
   return (
@@ -122,23 +157,35 @@ export default function ExpensesPage() {
       <div className="panel">
         <div className="panel-title-row">
           <h2>Expense Detail ({expensesInScope.length})</h2>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            {selectedIds.size > 0 && <span className="muted">{selectedIds.size} selected</span>}
+            <button
+              type="button"
+              className="btn btn-danger"
+              onClick={handleDeleteSelected}
+              disabled={!canDelete || selectedIds.size === 0 || deleting}
+              title={canDelete ? undefined : 'Only the super user account can delete expenses.'}
+            >
+              {deleting ? 'Deleting…' : 'Delete'}
+            </button>
+          </div>
         </div>
         <div className="summary-table-wrapper">
           <table className="data-table">
             <thead>
               <tr>
+                <th><input type="checkbox" checked={allOnScreenSelected} onChange={toggleSelectAll} /></th>
                 {shopConfig.expenseColumns.map((col) => <th key={col.key}>{col.label}</th>)}
-                <th></th>
               </tr>
             </thead>
             <tbody>
               {expensesInScope.map((e) => (
                 <tr key={e.id}>
+                  <td><input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggleRow(e.id)} /></td>
                   <td>{e.dateMillis ? new Date(e.dateMillis).toLocaleDateString() : '—'}</td>
                   <td>{e.category}</td>
                   <td>{e.description || '—'}</td>
                   <td>{formatCurrency(e.amount)}</td>
-                  <td><button type="button" className="btn btn-danger" onClick={() => handleDelete(e.id)}>Delete</button></td>
                 </tr>
               ))}
               {expensesInScope.length === 0 && (
