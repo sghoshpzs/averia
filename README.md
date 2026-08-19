@@ -1,4 +1,4 @@
-# Jewellery Shop Manager
+# Averia — Jewellery Shop Inventory & Invoicing Manager
 
 A lightweight single-page React application for managing a small jewellery shop: inventory intake, barcode-driven invoicing, customer management, sales summary, and WhatsApp-based communication. The app uses Firebase for authentication, storage, Firestore database and Cloud Functions to generate PDFs and send WhatsApp messages via Twilio.
 
