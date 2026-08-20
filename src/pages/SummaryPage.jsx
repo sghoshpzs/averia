@@ -358,7 +358,7 @@ export default function SummaryPage() {
                 <tr key={row.id}>
                   <td><input type="checkbox" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} /></td>
                   {shopConfig.inventoryListColumns.map((col) => {
-                    const editable = col.editable;
+                    const editable = col.editable && row.status !== 'Sold';
                     const val = row[col.key];
 
                     if (col.key === 'rowId') {

@@ -153,12 +153,25 @@ export async function checkoutInvoice(cartItems, invoiceData, invoiceId) {
       resolved.push({ item, invRef, data: snap.data() });
     }
 
-    // ---- VALIDATE PHASE — check every line before writing any of them ----
-    resolved.forEach(({ item, data }) => {
+    // Multiple cart lines can reference the same lot doc (e.g. the same
+    // batch barcode scanned twice in one invoice) — aggregate the combined
+    // demand per doc first. Validating/decrementing each line in isolation
+    // against the doc's original snapshot would let combined demand exceed
+    // what's actually in stock, and would only apply the LAST line's
+    // decrement (tx.update on the same doc doesn't accumulate across calls
+    // — later calls overwrite earlier ones), silently losing the rest.
+    const qtyByDocPath = new Map();
+    resolved.forEach(({ item, invRef }) => {
       const qty = Math.max(1, Number(item.quantity) || 1);
+      qtyByDocPath.set(invRef.path, (qtyByDocPath.get(invRef.path) || 0) + qty);
+    });
+
+    // ---- VALIDATE PHASE — check every line before writing any of them ----
+    resolved.forEach(({ invRef, data }) => {
       if (data.isLot) {
         const remaining = Number(data.quantityRemaining) || 0;
-        if (remaining < qty) {
+        const totalDemand = qtyByDocPath.get(invRef.path);
+        if (remaining < totalDemand) {
           throw new Error(`Only ${remaining} unit(s) left of ${data.rowId} (${data.name || data.type}) \u2014 reduce the quantity and try again.`);
         }
       } else if (data.status === 'Sold') {
@@ -168,6 +181,18 @@ export async function checkoutInvoice(cartItems, invoiceData, invoiceId) {
 
     // ---- WRITE PHASE ----
     tx.set(invoiceRef, { ...invoiceData, createdAtMillis: Date.now() });
+
+    // One update per lot doc, using the aggregated total — see note above.
+    const decrementedLotPaths = new Set();
+    resolved.forEach(({ invRef, data }) => {
+      if (!data.isLot || decrementedLotPaths.has(invRef.path)) return;
+      decrementedLotPaths.add(invRef.path);
+      const nextRemaining = (Number(data.quantityRemaining) || 0) - qtyByDocPath.get(invRef.path);
+      tx.update(invRef, {
+        quantityRemaining: nextRemaining,
+        status: nextRemaining === 0 ? 'Sold' : data.status
+      });
+    });
 
     resolved.forEach(({ item, invRef, data }) => {
       const qty = Math.max(1, Number(item.quantity) || 1);
@@ -189,11 +214,6 @@ export async function checkoutInvoice(cartItems, invoiceData, invoiceId) {
       };
 
       if (data.isLot) {
-        const nextRemaining = (Number(data.quantityRemaining) || 0) - qty;
-        tx.update(invRef, {
-          quantityRemaining: nextRemaining,
-          status: nextRemaining === 0 ? 'Sold' : data.status
-        });
         for (let i = 0; i < qty; i++) {
           const saleRef = doc(salesCol());
           tx.set(saleRef, {
