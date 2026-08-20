@@ -15,6 +15,22 @@ const emptyDraft = {
 };
 const emptyAddress = { line1: '', line2: '', district: '', state: '', pin: '' };
 
+// Fallback for when WhatsApp delivery fails — the Cloud Function still ships
+// the PDF bytes back (base64) so we can save it locally instead of leaving
+// the customer with nothing.
+function downloadPdfFromBase64(base64, filename) {
+  const byteChars = atob(base64);
+  const byteNumbers = new Array(byteChars.length);
+  for (let i = 0; i < byteChars.length; i++) byteNumbers[i] = byteChars.charCodeAt(i);
+  const blob = new Blob([new Uint8Array(byteNumbers)], { type: 'application/pdf' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 export default function InvoicePage() {
   const [draft, setDraft] = useState(emptyDraft);
   const [lookingUp, setLookingUp] = useState(false);
@@ -203,7 +219,6 @@ export default function InvoicePage() {
       );
 
       // 4. call Cloud Function to render PDF, upload to Storage, send WhatsApp via Twilio
-      let pdfUrl = null;
       try {
         const generateInvoice = httpsCallable(functions, 'generateInvoicePdfAndSend');
         const res = await generateInvoice({
@@ -214,20 +229,30 @@ export default function InvoicePage() {
           customerPhone,
           paymentMode
         });
-        pdfUrl = res?.data?.pdfUrl || null;
+        const { pdfUrl, whatsappSent, whatsappError, pdfBase64 } = res?.data || {};
+
+        if (whatsappSent === false) {
+          // WhatsApp delivery failed but the PDF was still generated and
+          // stored — auto-download it locally so the sale isn't left with
+          // no invoice in hand, instead of just reporting the failure.
+          if (pdfBase64) downloadPdfFromBase64(pdfBase64, `invoice-${invoiceId}.pdf`);
+          setResult({
+            type: 'warn',
+            text: `Invoice saved, but WhatsApp delivery failed (${whatsappError || 'unknown error'}) — the PDF ${pdfBase64 ? 'downloaded automatically' : 'is available'} instead. Link: ${pdfUrl}`
+          });
+        } else {
+          setResult({
+            type: 'success',
+            text: pdfUrl ? `Invoice saved and sent. PDF: ${pdfUrl}` : 'Invoice saved.'
+          });
+        }
       } catch (fnErr) {
         // Invoice + inventory updates already succeeded — surface the PDF/WhatsApp
-        // failure separately so the sale itself isn't lost.
+        // failure separately so the sale itself isn't lost. No PDF to fall back to
+        // here since the Cloud Function call itself failed before returning one.
         setResult({
           type: 'warn',
           text: `Invoice saved, but PDF/WhatsApp step failed: ${fnErr.message}. You can resend from the invoice record.`
-        });
-      }
-
-      if (!result) {
-        setResult({
-          type: 'success',
-          text: pdfUrl ? `Invoice saved and sent. PDF: ${pdfUrl}` : 'Invoice saved.'
         });
       }
 
