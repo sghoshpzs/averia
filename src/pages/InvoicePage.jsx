@@ -238,12 +238,14 @@ export default function InvoicePage() {
           if (pdfBase64) downloadPdfFromBase64(pdfBase64, `invoice-${invoiceId}.pdf`);
           setResult({
             type: 'warn',
-            text: `Invoice saved, but WhatsApp delivery failed (${whatsappError || 'unknown error'}) — the PDF ${pdfBase64 ? 'downloaded automatically' : 'is available'} instead. Link: ${pdfUrl}`
+            text: `Invoice saved, but WhatsApp delivery failed (${whatsappError || 'unknown error'}) — the PDF ${pdfBase64 ? 'downloaded automatically. You can also open it below' : 'is available below'} instead.`,
+            link: pdfUrl
           });
         } else {
           setResult({
             type: 'success',
-            text: pdfUrl ? `Invoice saved and sent. PDF: ${pdfUrl}` : 'Invoice saved.'
+            text: pdfUrl ? 'Invoice saved and sent.' : 'Invoice saved.',
+            link: pdfUrl
           });
         }
       } catch (fnErr) {
@@ -431,6 +433,9 @@ export default function InvoicePage() {
         {result && (
           <p style={{ marginTop: 14, color: result.type === 'error' ? '#b3372c' : result.type === 'warn' ? '#b8912f' : '#2f7a4f' }}>
             {result.text}
+            {result.link && (
+              <> <a href={result.link} target="_blank" rel="noopener noreferrer">View / download invoice PDF</a></>
+            )}
           </p>
         )}
 

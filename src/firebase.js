@@ -19,6 +19,10 @@ const app = initializeApp(firebaseConfig);
 
 export const db = getFirestore(app);
 export const storage = getStorage(app);
-export const functions = getFunctions(app);
+// Must match the region in functions/index.js's setGlobalOptions() — a
+// mismatch here makes the client call a Cloud Run URL where nothing is
+// deployed, which the browser reports as a blocked CORS preflight rather
+// than a clear "not found" error.
+export const functions = getFunctions(app, 'asia-south1');
 export const auth = getAuth(app);
 export default app;
