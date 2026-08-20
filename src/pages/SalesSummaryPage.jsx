@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import shopConfig from '../config/shopConfig';
-import { subscribeSales } from '../utils/firestoreHelpers';
+import { subscribeSales, subscribeInvoices } from '../utils/firestoreHelpers';
 import { calcProfit, formatCurrency } from '../utils/calculations';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
 
@@ -28,6 +28,7 @@ function LinkToggle({ options, value, onChange }) {
 
 export default function SalesSummaryPage() {
   const [sales, setSales] = useState([]);
+  const [invoices, setInvoices] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('All');
   const dateFilter = useDateFilterState();
   const [chartGroupBy, setChartGroupBy] = useState('category'); // 'category' | 'vendor'
@@ -37,6 +38,15 @@ export default function SalesSummaryPage() {
   const [pageSize, setPageSize] = useState(10);
 
   useEffect(() => subscribeSales(setSales), []);
+  useEffect(() => subscribeInvoices(setInvoices), []);
+
+  // invoiceId -> pdfUrl, so the Invoice ID column can link straight to the
+  // PDF once generateInvoicePdfAndSend has set it on the invoice doc.
+  const invoicePdfById = useMemo(() => {
+    const map = {};
+    invoices.forEach((inv) => { if (inv.pdfUrl) map[inv.id] = inv.pdfUrl; });
+    return map;
+  }, [invoices]);
 
   const salesInScope = useMemo(
     () => sales.filter((s) => (categoryFilter === 'All' || s.category === categoryFilter) && dateFilter.matches(s.soldDateMillis)),
@@ -260,7 +270,19 @@ export default function SalesSummaryPage() {
               {pagedRows.map((s) => (
                 <tr key={s.id}>
                   {shopConfig.salesColumns.map((col) => {
-                    if (col.key === 'invoiceId') return <td key={col.key}>{s.invoiceId || s.invoiceRef || '\u2014'}</td>;
+                    if (col.key === 'invoiceId') {
+                      const invId = s.invoiceId || s.invoiceRef;
+                      const pdfUrl = invId ? invoicePdfById[invId] : null;
+                      return (
+                        <td key={col.key}>
+                          {invId
+                            ? (pdfUrl
+                              ? <a href={pdfUrl} target="_blank" rel="noopener noreferrer">{invId}</a>
+                              : invId)
+                            : '\u2014'}
+                        </td>
+                      );
+                    }
                     if (col.key === 'onlinePurchase') {
                       return (
                         <td key={col.key}>

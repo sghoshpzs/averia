@@ -295,6 +295,13 @@ export async function createInvoiceRecord(invoiceData) {
   return ref.id;
 }
 
+// Used by SalesSummaryPage to link each sale row's invoice number to its
+// PDF (invoices/{id}.pdfUrl, set by the generateInvoicePdfAndSend Cloud
+// Function once the WhatsApp/PDF step completes).
+export function subscribeInvoices(callback) {
+  return onSnapshot(invoicesCol(), (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
+}
+
 // ---- Ad-Hoc Expenses -------------------------------------------------------
 
 export function subscribeExpenses(callback) {
