@@ -16,6 +16,7 @@ A lightweight single-page React application for managing a small jewellery shop:
 - [Configuration](#configuration)
 - [Development & build](#development--build)
 - [Deploy](#deploy)
+- [CI/CD (GitHub Actions)](#cicd-github-actions)
 - [Customizing invoice PDF](#customizing-invoice-pdf)
 - [Contributing](#contributing)
 - [License](#license)
@@ -24,11 +25,14 @@ A lightweight single-page React application for managing a small jewellery shop:
 
 ## Features
 
-- Role-based access (admin / worker).
-- Inventory CRUD with configurable categories, types and vendors.
+- Role-based access (admin / worker), with a super-user override for destructive actions.
+- Inventory intake with configurable categories, types and vendors; supports both unique-barcode items and shared-barcode "lots" (e.g. a batch of identical beads sold as individual units).
 - Barcode/QR scanning for fast invoice line-item lookup (html5-qrcode).
-- Create invoices, apply discounts and generate/send PDFs via Cloud Functions.
-- Customers list with WhatsApp messaging integration (Twilio).
+- Create invoices, apply discounts, and generate/send PDFs via a Cloud Function — the PDF uploads to Storage and a WhatsApp message goes out via Twilio with a stable, token-protected download link; if WhatsApp delivery fails, the PDF downloads automatically in the browser instead.
+- Inventory Summary — invested-amount chart/table (grouped by category or vendor, excludes stock that's already sold), a filterable/sortable detail table (sold rows are highlighted), bulk delete, and CSV export.
+- Sales Summary — revenue/profit chart and detail table with per-sale profit, filterable by date/category, and CSV export; each row links to that sale's invoice PDF.
+- Ad-Hoc Expenses tracking (rent, utilities, repairs, etc.) with bulk delete and CSV export.
+- Customers list (auto-created from invoices) with purchase history and WhatsApp marketing blasts (Twilio).
 - Responsive layout and simple admin UI for shop configuration.
 
 ## Screenshots
@@ -55,7 +59,7 @@ A lightweight single-page React application for managing a small jewellery shop:
 
 ## Prerequisites
 
-- Node.js 18+ and npm
+- Node.js 18+ and npm for the frontend; `functions/` pins Node 20 specifically (see `functions/package.json`'s `engines` field)
 - A Firebase project with Billing enabled (Blaze) for external API calls
 - Twilio account for WhatsApp (sandbox for testing)
 
@@ -129,10 +133,42 @@ To change allowed admin/worker users, set the environment variables in `.env`:
 
 ## Deploy
 
+Deploys normally happen automatically via GitHub Actions on push to `main` — see [CI/CD](#cicd-github-actions) below. To deploy manually instead:
+
 1. Build assets: `npm run build`
 2. Deploy hosting, functions and security rules:
 
    firebase deploy --only hosting,functions,firestore:rules,storage:rules
+
+### Cloud Functions Gen 2 — one-time IAM setup
+
+The Cloud Functions here (`generateInvoicePdfAndSend`, `viewInvoicePdf`, `sendWhatsappMarketing`) are 2nd Gen, which run on Cloud Run under the project's default Compute Engine service account (`PROJECT_NUMBER-compute@developer.gserviceaccount.com`). Whoever/whatever deploys them — your own Google account for local deploys, or the CI service account for GitHub Actions — must be granted **Service Account User** (`roles/iam.serviceAccountUser`) on that specific service account, or every deploy fails with a `403 iam.serviceaccounts.actAs` error. This is a one-time grant per deploying identity:
+
+1. Google Cloud Console → **IAM & Admin → Service Accounts** → click the `...-compute@developer.gserviceaccount.com` row (not the project-level IAM page — this must be granted on the service account's own Permissions tab).
+2. **Permissions** tab → **Grant Access**.
+3. Add the deploying principal (your Google account email, and/or the CI deploy service account's email) with role **Service Account User**.
+4. Save, then re-run the deploy.
+
+## CI/CD (GitHub Actions)
+
+`.github/workflows/firebase-deploy.yml` deploys on every push to `main`:
+
+- **Hosting** rebuilds and deploys on every push.
+- **Cloud Functions** redeploy only when `functions/**` changed (or via manual "Run workflow" dispatch), so an unrelated frontend change doesn't trigger a functions redeploy.
+
+Required repo secrets (Settings → Secrets and variables → Actions):
+
+| Secret | Used for |
+| --- | --- |
+| `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID` | Baked into the hosting build (same values as `.env`) |
+| `VITE_ALLOWED_ADMINS`, `VITE_ALLOWED_WORKERS` | Baked into the hosting build (same as `.env`) |
+| `FIREBASE_SERVICE_ACCOUNT_AVERIA_JEWELRY` | Hosting deploy credential |
+| `FIREBASE_FUNCTIONS_DEPLOY_KEY` | Full JSON of a service account key with Cloud Functions deploy rights — see the IAM note above, this identity also needs `roles/iam.serviceAccountUser` on the compute service account |
+| `SHOP_NAME`, `SHOP_ADDRESS`, `SHOP_PHONE`, `SHOP_EMAIL` | Written into `functions/.env` at deploy time (see `functions/.env.example`) |
+
+Twilio secrets (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`) are **not** managed by this workflow — they live in Google Secret Manager already (set via `firebase functions:secrets:set`, see [Firebase setup](#firebase-setup)) and are read directly by the functions at runtime.
+
+A separate `.github/workflows/firebase-hosting-pull-request.yml` deploys a preview hosting channel for pull requests from within this repo.
 
 ## Customizing invoice PDF
 
