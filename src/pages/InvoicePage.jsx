@@ -258,11 +258,18 @@ export default function InvoicePage() {
           // WhatsApp delivery failed but the PDF was still generated and
           // stored — auto-download it locally so the sale isn't left with
           // no invoice in hand, instead of just reporting the failure.
-          if (pdfBase64) downloadPdfFromBase64(pdfBase64, `invoice-${invoiceId}.pdf`);
+          if (pdfBase64) {
+            downloadPdfFromBase64(pdfBase64, `invoice-${invoiceId}.pdf`);
+            // The download already happened, so this banner is just a
+            // heads-up, not something to act on — clear it on its own
+            // instead of leaving it sitting on screen after the fact.
+            setTimeout(() => setResult((r) => (r?.autoDownloaded ? null : r)), 6000);
+          }
           setResult({
             type: 'warn',
             text: `Invoice saved, but WhatsApp delivery failed (${whatsappError || 'unknown error'}) — the PDF ${pdfBase64 ? 'downloaded automatically. You can also open it below' : 'is available below'} instead.`,
-            link: pdfUrl
+            link: pdfUrl,
+            autoDownloaded: Boolean(pdfBase64)
           });
         } else {
           setResult({
