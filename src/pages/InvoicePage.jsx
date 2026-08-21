@@ -3,7 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 import shopConfig from '../config/shopConfig';
 import BarcodeScanner from '../components/BarcodeScanner';
 import { calcFinalPrice, formatCurrency } from '../utils/calculations';
-import { findInventoryByRowId, checkoutInvoice, upsertCustomerOnPurchase, reserveInvoiceId } from '../utils/firestoreHelpers';
+import { findInventoryByRowId, checkoutInvoice, upsertCustomerOnPurchase, findCustomerByPhone, reserveInvoiceId } from '../utils/firestoreHelpers';
 import { functions } from '../firebase';
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -38,6 +38,8 @@ export default function InvoicePage() {
   const [customerName, setCustomerName] = useState('');
   const [customerPhone, setCustomerPhone] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
+  const [customerLookup, setCustomerLookup] = useState(null); // null | 'checking' | 'found' | 'new'
+  const [matchedPhone, setMatchedPhone] = useState(null); // phone the current name/email auto-fill came from
   const [onlinePurchase, setOnlinePurchase] = useState(false);
   const [address, setAddress] = useState(emptyAddress);
   const [paymentMode, setPaymentMode] = useState('');
@@ -138,6 +140,27 @@ export default function InvoicePage() {
 
   const cartTotal = items.reduce((sum, i) => sum + Number(i.finalPrice || 0) * (Number(i.quantity) || 1), 0);
   const activated = Boolean(draft.barcode) && !draft.barcodeError;
+
+  // Looked up once the cashier finishes typing the phone number — auto-fills
+  // name/email for a returning customer instead of re-typing them and
+  // accidentally creating a second customer record under the same phone.
+  async function handlePhoneBlur() {
+    const phone = customerPhone.trim();
+    if (!phone) {
+      setCustomerLookup(null);
+      return;
+    }
+    setCustomerLookup('checking');
+    const existing = await findCustomerByPhone(phone);
+    if (existing) {
+      setCustomerName(existing.name || '');
+      setCustomerEmail((prev) => prev || existing.email || '');
+      setMatchedPhone(phone);
+      setCustomerLookup('found');
+    } else {
+      setCustomerLookup('new');
+    }
+  }
 
   async function handleCheckout() {
     setResult(null);
@@ -262,6 +285,8 @@ export default function InvoicePage() {
       setCustomerName('');
       setCustomerPhone('');
       setCustomerEmail('');
+      setCustomerLookup(null);
+      setMatchedPhone(null);
       setOnlinePurchase(false);
       setAddress(emptyAddress);
       setPaymentMode('');
@@ -396,16 +421,37 @@ export default function InvoicePage() {
             <input type="text" readOnly value={invoiceId} className="opaque" />
           </div>
           <div className="field">
-            <label>Customer Name</label>
-            <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
-          </div>
-          <div className="field">
             <label>Customer Phone (WhatsApp)</label>
-            <input type="text" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} placeholder="+91XXXXXXXXXX" />
+            <input
+              type="text"
+              value={customerPhone}
+              onChange={(e) => {
+                const next = e.target.value;
+                setCustomerPhone(next);
+                setCustomerLookup(null);
+                // The name/email currently shown came from a lookup match on
+                // the OLD phone number — clear them so a stale match doesn't
+                // silently get attached to a different phone at checkout.
+                if (matchedPhone && next.trim() !== matchedPhone) {
+                  setCustomerName('');
+                  setCustomerEmail('');
+                  setMatchedPhone(null);
+                }
+              }}
+              onBlur={handlePhoneBlur}
+              placeholder="+91XXXXXXXXXX"
+            />
+            {customerLookup === 'checking' && <p className="muted" style={{ margin: '4px 0 0' }}>Checking…</p>}
+            {customerLookup === 'found' && <p className="muted" style={{ margin: '4px 0 0' }}>Existing customer — name filled in below.</p>}
+            {customerLookup === 'new' && <p className="muted" style={{ margin: '4px 0 0' }}>New customer — enter their name below.</p>}
           </div>
           <div className="field">
             <label>Email ID</label>
             <input type="email" value={customerEmail} onChange={(e) => setCustomerEmail(e.target.value)} placeholder="name@example.com" />
+          </div>
+          <div className="field">
+            <label>Customer Name</label>
+            <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} />
           </div>
           <div className="field">
             <label>Payment Mode</label>

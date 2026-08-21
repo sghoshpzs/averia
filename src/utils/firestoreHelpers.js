@@ -281,6 +281,18 @@ export function subscribeCustomers(callback) {
   return onSnapshot(q, (snap) => callback(snap.docs.map((d) => ({ id: d.id, ...d.data() }))));
 }
 
+// Used by InvoicePage.jsx to auto-fill name/email once the phone number is
+// entered, so repeat customers don't create a second customer record under
+// the same phone number (matched the same way upsertCustomerOnPurchase does).
+export async function findCustomerByPhone(phone) {
+  if (!phone) return null;
+  const q = query(customersCol(), where('phone', '==', phone));
+  const snap = await getDocs(q);
+  if (snap.empty) return null;
+  const d = snap.docs[0];
+  return { id: d.id, ...d.data() };
+}
+
 // Creates the customer if new, or increments totals if they already exist
 // (matched by phone number). Called from the invoice checkout flow.
 export async function upsertCustomerOnPurchase({ name, phone, email, address }, invoiceAmount, invoiceRef) {
