@@ -2,13 +2,24 @@ import { useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import shopConfig from '../config/shopConfig';
 import { subscribeInventory, updateInventoryDoc, markPrinted, deleteInventoryDocs } from '../utils/firestoreHelpers';
-import { calcPrintedPrice, formatCurrency } from '../utils/calculations';
+import { calcPrintedPrice, formatCurrency, formatDate } from '../utils/calculations';
 import { isSuperUser } from '../utils/auth';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
 import { exportRowsToCsv } from '../utils/exportCsv';
 
 const COLORS = ['#1f5fb5', '#c19a5a', '#1f7a5e', '#8a6fae', '#c92d39', '#3f6b8a'];
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
+
+// Value still tied up in unsold stock only — a lot's cost follows its
+// remaining (unsold) units, and a sold unique-barcode item contributes
+// nothing once its status flips to 'Sold'. Used everywhere "Invested" is
+// aggregated (stat tile, chart, side table) so sold items' cost drops out
+// once they're no longer on hand.
+function investedAmount(r) {
+  const cost = Number(r.cost) || 0;
+  if (r.isLot) return cost * (Number(r.quantityRemaining) || 0);
+  return r.status === 'Sold' ? 0 : cost;
+}
 
 // Small text-link toggle used for "only one view at a time, switched by
 // clicking a hyperlink" controls (chart grouping, side-table view).
@@ -52,10 +63,7 @@ export default function SummaryPage() {
 
   // ---- Summary stats — inventory-derived, scoped by the date filter above;
   // no profit here (that lives on Sales Summary instead) ----
-  const totalInvested = inventoryInScope.reduce(
-    (s, r) => s + (Number(r.cost) || 0) * (Number(r.quantityPurchased) || 1),
-    0
-  );
+  const totalInvested = inventoryInScope.reduce((s, r) => s + investedAmount(r), 0);
   const unitsPurchased = inventoryInScope.reduce((s, r) => s + (Number(r.quantityPurchased) || 1), 0);
   const unitsSold = inventoryInScope.reduce((s, r) => {
     if (r.isLot) return s + ((Number(r.quantityPurchased) || 0) - (Number(r.quantityRemaining) || 0));
@@ -67,8 +75,7 @@ export default function SummaryPage() {
     const byGroup = {};
     inventoryInScope.forEach((r) => {
       const key = chartGroupBy === 'category' ? r.category : (r.vendor || 'Unknown');
-      const amount = (Number(r.cost) || 0) * (Number(r.quantityPurchased) || 1);
-      byGroup[key] = (byGroup[key] || 0) + amount;
+      byGroup[key] = (byGroup[key] || 0) + investedAmount(r);
     });
     return Object.entries(byGroup).map(([label, invested]) => ({ label, invested: Number(invested.toFixed(2)) }));
   }, [inventoryInScope, chartGroupBy]);
@@ -79,16 +86,14 @@ export default function SummaryPage() {
     if (categoryFilter === 'All') {
       const byCat = {};
       inventoryInScope.forEach((r) => {
-        const amount = (Number(r.cost) || 0) * (Number(r.quantityPurchased) || 1);
-        byCat[r.category] = (byCat[r.category] || 0) + amount;
+        byCat[r.category] = (byCat[r.category] || 0) + investedAmount(r);
       });
       return Object.entries(byCat).map(([label, invested]) => ({ label, invested }));
     }
     const byGroup = {};
     inventoryInScope.forEach((r) => {
       const key = sideTableGroupBy === 'type' ? r.type : (r.vendor || 'Unknown');
-      const amount = (Number(r.cost) || 0) * (Number(r.quantityPurchased) || 1);
-      byGroup[key] = (byGroup[key] || 0) + amount;
+      byGroup[key] = (byGroup[key] || 0) + investedAmount(r);
     });
     return Object.entries(byGroup).map(([label, invested]) => ({ label, invested }));
   }, [inventoryInScope, categoryFilter, sideTableGroupBy]);
@@ -228,7 +233,7 @@ export default function SummaryPage() {
           return r.isLot ? (r[col.key] ?? 0) : (col.key === 'quantityPurchased' ? 1 : '');
         }
         if (col.filter === 'date') {
-          return r.createdAtMillis ? new Date(r.createdAtMillis).toLocaleDateString() : '';
+          return formatDate(r.createdAtMillis);
         }
         return r[col.key] ?? '';
       }
@@ -412,8 +417,7 @@ export default function SummaryPage() {
                       );
                     }
                     if (col.filter === 'date') {
-                      const millis = row.createdAtMillis;
-                      return <td key={col.key}>{millis ? new Date(millis).toLocaleDateString() : '\u2014'}</td>;
+                      return <td key={col.key}>{formatDate(row.createdAtMillis) || '\u2014'}</td>;
                     }
                     if (editable) {
                       return (

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import shopConfig from '../config/shopConfig';
 import { subscribeSales, subscribeInvoices } from '../utils/firestoreHelpers';
-import { calcProfit, formatCurrency } from '../utils/calculations';
+import { calcProfit, formatCurrency, formatDate } from '../utils/calculations';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
 import { exportRowsToCsv } from '../utils/exportCsv';
 
@@ -148,7 +148,7 @@ export default function SalesSummaryPage() {
         if (col.key === 'invoiceId') return s.invoiceId || s.invoiceRef || '';
         if (col.key === 'onlinePurchase') return s.onlinePurchase ? 'Yes' : 'No';
         if (col.key === 'profit') return calcProfit(s.soldPrice, s.cost);
-        if (col.key === 'soldDate') return s.soldDateMillis ? new Date(s.soldDateMillis).toLocaleDateString() : '';
+        if (col.key === 'soldDate') return formatDate(s.soldDateMillis);
         return s[col.key] ?? '';
       }
     }));
@@ -312,7 +312,7 @@ export default function SalesSummaryPage() {
                     }
                     if (col.key === 'profit') return <td key={col.key}>{formatCurrency(calcProfit(s.soldPrice, s.cost))}</td>;
                     if (col.key === 'soldDate') {
-                      return <td key={col.key}>{s.soldDateMillis ? new Date(s.soldDateMillis).toLocaleDateString() : '\u2014'}</td>;
+                      return <td key={col.key}>{formatDate(s.soldDateMillis) || '\u2014'}</td>;
                     }
                     if (col.filter === 'number' && (col.key === 'printedPrice' || col.key === 'soldPrice')) {
                       return <td key={col.key}>{formatCurrency(s[col.key])}</td>;

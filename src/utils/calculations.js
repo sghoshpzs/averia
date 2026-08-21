@@ -34,3 +34,15 @@ export function formatCurrency(amount, symbol = '\u20B9') {
   const n = Number(amount) || 0;
   return `${symbol}${n.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
+
+// YYYY-MM-DD everywhere a date is displayed, instead of toLocaleDateString()
+// (whose format silently changes with the viewer's browser locale).
+export function formatDate(millisOrDate) {
+  if (!millisOrDate) return '';
+  const d = millisOrDate instanceof Date ? millisOrDate : new Date(millisOrDate);
+  if (Number.isNaN(d.getTime())) return '';
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}

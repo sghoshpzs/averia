@@ -26,6 +26,16 @@ const GOLD = '#9c7a34';
 const INK = '#1a1a1a';
 const MUTED = '#666666';
 
+// YYYY-MM-DD, matching the date format used everywhere else in the app
+// (see src/utils/calculations.js#formatDate) instead of a locale-dependent
+// toLocaleDateString().
+function formatDate(date) {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+}
+
 // Small self-drawn icons (vector, not image assets) so there's no external
 // brand-asset file to source/license — just enough to read as "Facebook"/
 // "Instagram" at invoice-header size. Each is wrapped in doc.link(...) so
@@ -89,7 +99,7 @@ function drawInvoice(doc, data) {
 
   doc.fillColor(INK).fontSize(14).text('INVOICE', 400, 44, { align: 'right' });
   doc.fillColor(MUTED).fontSize(9).text(`Invoice #: ${invoiceId}`, 400, 64, { align: 'right' });
-  doc.text(`Date: ${new Date().toLocaleDateString()}`, 400, 78, { align: 'right' });
+  doc.text(`Date: ${formatDate(new Date())}`, 400, 78, { align: 'right' });
 
   const dividerY = Math.max(iconY + iconSize + 14, 108);
   doc.moveTo(40, dividerY).lineTo(555, dividerY).strokeColor('#dddddd').stroke();

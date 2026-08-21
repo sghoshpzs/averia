@@ -1,0 +1,104 @@
+# Combined Firebase deploy workflow (was two separate files —
+# firebase-hosting-merge.yml and firebase-functions-deploy.yml — merged so
+# there's one pipeline to look at instead of two independently-triggered
+# ones). Hosting redeploys on every push to main; Cloud Functions redeploy
+# only when functions/** changed, or via manual dispatch — same conditions
+# each had on its own before.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   VITE_FIREBASE_*, VITE_ALLOWED_ADMINS, VITE_ALLOWED_WORKERS - build-time
+#                                    env vars baked into the hosting bundle
+#   FIREBASE_SERVICE_ACCOUNT_AVERIA_JEWELRY - hosting deploy credential
+#   FIREBASE_FUNCTIONS_DEPLOY_KEY  - full JSON contents of a service account
+#                                    key with deploy rights (this project
+#                                    uses scripts/serviceAccountKey.json's
+#                                    account, proven to work for this exact
+#                                    deploy already)
+#   SHOP_NAME, SHOP_ADDRESS, SHOP_PHONE, SHOP_EMAIL - written into
+#                                    functions/.env at deploy time
+#
+# Note: this does NOT manage Twilio secrets (TWILIO_ACCOUNT_SID etc.) -
+# those live in Google Secret Manager already (see functions/index.js) and
+# aren't touched by this workflow at all.
+name: Deploy to Firebase on merge
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch: {}
+jobs:
+  detect-changes:
+    runs-on: ubuntu-latest
+    outputs:
+      functions: ${{ steps.filter.outputs.functions }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          filters: |
+            functions:
+              - 'functions/**'
+
+  deploy_hosting:
+    needs: detect-changes
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 24 }
+      - run: npm ci && npm run build
+        env:
+          VITE_FIREBASE_API_KEY: ${{ secrets.VITE_FIREBASE_API_KEY }}
+          VITE_FIREBASE_AUTH_DOMAIN: ${{ secrets.VITE_FIREBASE_AUTH_DOMAIN }}
+          VITE_FIREBASE_PROJECT_ID: ${{ secrets.VITE_FIREBASE_PROJECT_ID }}
+          VITE_FIREBASE_STORAGE_BUCKET: ${{ secrets.VITE_FIREBASE_STORAGE_BUCKET }}
+          VITE_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.VITE_FIREBASE_MESSAGING_SENDER_ID }}
+          VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
+          VITE_ALLOWED_ADMINS: ${{ secrets.VITE_ALLOWED_ADMINS }}
+          VITE_ALLOWED_WORKERS: ${{ secrets.VITE_ALLOWED_WORKERS }}
+      - uses: FirebaseExtended/action-hosting-deploy@v0
+        with:
+          repoToken: ${{ secrets.GITHUB_TOKEN }}
+          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_AVERIA_JEWELRY }}
+          channelId: live
+          projectId: averia-jewelry
+
+  deploy_functions:
+    needs: detect-changes
+    if: needs.detect-changes.outputs.functions == 'true' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npm ci
+        working-directory: functions
+
+      - name: Write functions/.env from secrets
+        run: |
+          cat > functions/.env <<EOF
+          SHOP_NAME=${{ secrets.SHOP_NAME }}
+          SHOP_ADDRESS=${{ secrets.SHOP_ADDRESS }}
+          SHOP_PHONE=${{ secrets.SHOP_PHONE }}
+          SHOP_EMAIL=${{ secrets.SHOP_EMAIL }}
+          EOF
+
+      # firebase deploy's local "discover your functions" step runs your
+      # code on THIS runner (not in the cloud) to introspect it, and hangs
+      # for 10s trying to auto-detect credentials via a metadata service
+      # that doesn't exist off-GCP — the exact same issue hit during local
+      # deploys this project. Placing the key at the well-known Application
+      # Default Credentials path fixes it (its own local discovery child
+      # process ignores GOOGLE_APPLICATION_CREDENTIALS, so the env var
+      # alone isn't enough).
+      - name: Set up service account credentials
+        run: |
+          echo '${{ secrets.FIREBASE_FUNCTIONS_DEPLOY_KEY }}' > "$RUNNER_TEMP/service-account.json"
+          mkdir -p "$HOME/.config/gcloud"
+          cp "$RUNNER_TEMP/service-account.json" "$HOME/.config/gcloud/application_default_credentials.json"
+
+      - name: Deploy functions
+        run: npx firebase-tools deploy --only functions --project averia-jewelry --non-interactive
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/service-account.json

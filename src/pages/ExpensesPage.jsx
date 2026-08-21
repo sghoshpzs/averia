@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import shopConfig from '../config/shopConfig';
 import { subscribeExpenses, addExpense, deleteExpenses } from '../utils/firestoreHelpers';
-import { formatCurrency } from '../utils/calculations';
+import { formatCurrency, formatDate } from '../utils/calculations';
 import { isSuperUser } from '../utils/auth';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
 import { exportRowsToCsv } from '../utils/exportCsv';
@@ -87,7 +87,7 @@ export default function ExpensesPage() {
   function handleExportCsv() {
     const columns = shopConfig.expenseColumns.map((col) => ({
       label: col.label,
-      get: (e) => (col.key === 'date' ? (e.dateMillis ? new Date(e.dateMillis).toLocaleDateString() : '') : e[col.key] ?? '')
+      get: (e) => (col.key === 'date' ? formatDate(e.dateMillis) : e[col.key] ?? '')
     }));
     exportRowsToCsv('expenses-export', columns, expensesInScope);
   }
@@ -194,7 +194,7 @@ export default function ExpensesPage() {
               {expensesInScope.map((e) => (
                 <tr key={e.id}>
                   <td><input type="checkbox" checked={selectedIds.has(e.id)} onChange={() => toggleRow(e.id)} /></td>
-                  <td>{e.dateMillis ? new Date(e.dateMillis).toLocaleDateString() : '—'}</td>
+                  <td>{formatDate(e.dateMillis) || '—'}</td>
                   <td>{e.category}</td>
                   <td>{e.description || '—'}</td>
                   <td>{formatCurrency(e.amount)}</td>

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import { subscribeCustomers } from '../utils/firestoreHelpers';
-import { formatCurrency } from '../utils/calculations';
+import { formatCurrency, formatDate } from '../utils/calculations';
 import { functions } from '../firebase';
 import { exportRowsToCsv } from '../utils/exportCsv';
 
@@ -108,9 +108,9 @@ export default function CustomersPage() {
             {expanded[c.id] && (
               <div className="customer-expand">
                 {(c.purchases || []).length === 0 && <p>No purchase history.</p>}
-                {(c.purchases || []).map((p, idx) => (
+                {[...(c.purchases || [])].sort((a, b) => (b.date || 0) - (a.date || 0)).map((p, idx) => (
                   <div key={idx} style={{ marginBottom: 4 }}>
-                    {new Date(p.date).toLocaleDateString()} — {formatCurrency(p.amount)}
+                    {formatDate(p.date)} — {formatCurrency(p.amount)}
                     {p.invoiceRef ? <> · <a href={`#/invoice/${p.invoiceRef}`}>Invoice link</a></> : null}
                   </div>
                 ))}
