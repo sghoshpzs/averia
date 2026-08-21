@@ -3,6 +3,9 @@ dist/
 .env
 .firebase/
 functions/node_modules/
+functions/.env
+functions/.env.*
+!functions/.env.example
 *.log
 .agents/
 !.agents/skills.json
