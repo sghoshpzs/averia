@@ -3,6 +3,7 @@ import { httpsCallable } from 'firebase/functions';
 import { subscribeCustomers } from '../utils/firestoreHelpers';
 import { formatCurrency } from '../utils/calculations';
 import { functions } from '../firebase';
+import { exportRowsToCsv } from '../utils/exportCsv';
 
 export default function CustomersPage() {
   const [customers, setCustomers] = useState([]);
@@ -22,6 +23,17 @@ export default function CustomersPage() {
   }
 
   const selectedIds = Object.keys(selected).filter((id) => selected[id]);
+
+  function handleExportCsv() {
+    const columns = [
+      { label: 'Name', get: (c) => c.name },
+      { label: 'Phone', get: (c) => c.phone },
+      { label: 'Email', get: (c) => c.email || '' },
+      { label: 'Address', get: (c) => c.address ? [c.address.line1, c.address.line2, c.address.district, c.address.state, c.address.pin].filter(Boolean).join(', ') : '' },
+      { label: 'Total Purchased', get: (c) => c.totalPurchased || 0 }
+    ];
+    exportRowsToCsv('customers-export', columns, customers);
+  }
 
   async function sendMarketing() {
     if (selectedIds.length === 0 || !message.trim()) return;
@@ -45,7 +57,12 @@ export default function CustomersPage() {
     <div>
       <div className="panel-title-row" style={{ marginBottom: 8 }}>
         <h1 style={{ marginBottom: 0 }}>Customers</h1>
-        <span className="muted">{selectedIds.length} selected</span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          <span className="muted">{selectedIds.length} selected</span>
+          <button type="button" className="btn btn-secondary" onClick={handleExportCsv} disabled={customers.length === 0}>
+            Export CSV
+          </button>
+        </div>
       </div>
 
       <div className="panel">

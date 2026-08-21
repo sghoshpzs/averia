@@ -227,6 +227,12 @@ table.data-table.excel-table tbody tr:nth-child(even) td {
 table.data-table.excel-table tbody tr:hover td {
   background: rgba(31, 95, 181, 0.08);
 }
+table.data-table.excel-table tbody tr.row-sold td {
+  background: var(--success-tint);
+}
+table.data-table.excel-table tbody tr.row-sold:hover td {
+  background: #d3ecdd;
+}
 
 .badge { display: inline-block; padding: 3px 10px; border-radius: 999px; font-size: 11px; font-weight: 700; letter-spacing: 0.03em; }
 .badge-purchased { background: var(--danger-tint); color: var(--danger); }

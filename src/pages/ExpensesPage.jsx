@@ -4,6 +4,7 @@ import { subscribeExpenses, addExpense, deleteExpenses } from '../utils/firestor
 import { formatCurrency } from '../utils/calculations';
 import { isSuperUser } from '../utils/auth';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
+import { exportRowsToCsv } from '../utils/exportCsv';
 
 function todayInputValue() {
   return new Date().toISOString().slice(0, 10);
@@ -83,6 +84,14 @@ export default function ExpensesPage() {
     }
   }
 
+  function handleExportCsv() {
+    const columns = shopConfig.expenseColumns.map((col) => ({
+      label: col.label,
+      get: (e) => (col.key === 'date' ? (e.dateMillis ? new Date(e.dateMillis).toLocaleDateString() : '') : e[col.key] ?? '')
+    }));
+    exportRowsToCsv('expenses-export', columns, expensesInScope);
+  }
+
   async function handleDeleteSelected() {
     if (selectedIds.size === 0) return;
     if (!window.confirm(`Delete ${selectedIds.size} selected expense(s)? This cannot be undone.`)) return;
@@ -158,6 +167,9 @@ export default function ExpensesPage() {
         <div className="panel-title-row">
           <h2>Expense Detail ({expensesInScope.length})</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button type="button" className="btn btn-secondary" onClick={handleExportCsv} disabled={expensesInScope.length === 0}>
+              Export CSV
+            </button>
             {selectedIds.size > 0 && <span className="muted">{selectedIds.size} selected</span>}
             <button
               type="button"

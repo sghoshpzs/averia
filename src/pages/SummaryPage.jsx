@@ -5,6 +5,7 @@ import { subscribeInventory, updateInventoryDoc, markPrinted, deleteInventoryDoc
 import { calcPrintedPrice, formatCurrency } from '../utils/calculations';
 import { isSuperUser } from '../utils/auth';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
+import { exportRowsToCsv } from '../utils/exportCsv';
 
 const COLORS = ['#1f5fb5', '#c19a5a', '#1f7a5e', '#8a6fae', '#c92d39', '#3f6b8a'];
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
@@ -110,7 +111,7 @@ export default function SummaryPage() {
   };
 
   const detailRows = useMemo(() => {
-    return inventoryInScope.filter((r) => {
+    const filtered = inventoryInScope.filter((r) => {
       return shopConfig.inventoryListColumns.every((col) => {
         const raw = columnFilters[col.key];
         if (!raw) return true;
@@ -131,6 +132,13 @@ export default function SummaryPage() {
         return String(cellValue ?? '').toLowerCase().includes(raw.toLowerCase());
       });
     });
+    // Order by Status, then Category, then Type, then Row ID.
+    return [...filtered].sort((a, b) =>
+      String(a.status ?? '').localeCompare(String(b.status ?? ''))
+      || String(a.category ?? '').localeCompare(String(b.category ?? ''))
+      || String(a.type ?? '').localeCompare(String(b.type ?? ''))
+      || String(a.rowId ?? '').localeCompare(String(b.rowId ?? ''))
+    );
   }, [inventoryInScope, columnFilters]);
 
   const totalPages = Math.max(1, Math.ceil(detailRows.length / pageSize));
@@ -143,7 +151,10 @@ export default function SummaryPage() {
     if (page > totalPages - 1) setPage(Math.max(0, totalPages - 1));
   }, [totalPages, page]);
 
-  const allOnPageSelected = pagedRows.length > 0 && pagedRows.every((r) => selectedIds.has(r.id));
+  // Selects/deselects every row matching the current filters (across all
+  // pages), not just the page currently on screen — matches what Delete
+  // actually acts on.
+  const allFilteredSelected = detailRows.length > 0 && detailRows.every((r) => selectedIds.has(r.id));
 
   function toggleRow(id) {
     setSelectedIds((prev) => {
@@ -153,13 +164,13 @@ export default function SummaryPage() {
     });
   }
 
-  function toggleSelectAllOnPage() {
+  function toggleSelectAll() {
     setSelectedIds((prev) => {
       const next = new Set(prev);
-      if (allOnPageSelected) {
-        pagedRows.forEach((r) => next.delete(r.id));
+      if (allFilteredSelected) {
+        detailRows.forEach((r) => next.delete(r.id));
       } else {
-        pagedRows.forEach((r) => next.add(r.id));
+        detailRows.forEach((r) => next.add(r.id));
       }
       return next;
     });
@@ -205,6 +216,24 @@ export default function SummaryPage() {
     a.click();
     URL.revokeObjectURL(url);
     await markPrinted(detailRows.map((r) => r.id));
+  }
+
+  // Full export of every row matching the current filters (all columns
+  // shown in the table, not just row_id/printed_price like Print CSV).
+  function handleExportCsv() {
+    const columns = shopConfig.inventoryListColumns.map((col) => ({
+      label: col.label,
+      get: (r) => {
+        if (col.key === 'quantityPurchased' || col.key === 'quantityRemaining') {
+          return r.isLot ? (r[col.key] ?? 0) : (col.key === 'quantityPurchased' ? 1 : '');
+        }
+        if (col.filter === 'date') {
+          return r.createdAtMillis ? new Date(r.createdAtMillis).toLocaleDateString() : '';
+        }
+        return r[col.key] ?? '';
+      }
+    }));
+    exportRowsToCsv('inventory-export', columns, detailRows);
   }
 
   return (
@@ -310,6 +339,9 @@ export default function SummaryPage() {
         <div className="panel-title-row">
           <h2>Inventory Detail ({detailRows.length})</h2>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <button type="button" className="btn btn-secondary" onClick={handleExportCsv} disabled={detailRows.length === 0}>
+              Export CSV
+            </button>
             <button type="button" className="btn btn-secondary" onClick={handlePrintCsv} disabled={detailRows.length === 0}>
               Print CSV
             </button>
@@ -332,7 +364,7 @@ export default function SummaryPage() {
           <table className="data-table wide excel-table">
             <thead>
               <tr>
-                <th><input type="checkbox" checked={allOnPageSelected} onChange={toggleSelectAllOnPage} /></th>
+                <th><input type="checkbox" checked={allFilteredSelected} onChange={toggleSelectAll} /></th>
                 {shopConfig.inventoryListColumns.map((col) => (
                   <th key={col.key}>
                     {col.label}
@@ -355,7 +387,7 @@ export default function SummaryPage() {
             </thead>
             <tbody>
               {pagedRows.map((row) => (
-                <tr key={row.id}>
+                <tr key={row.id} className={row.status === 'Sold' ? 'row-sold' : ''}>
                   <td><input type="checkbox" checked={selectedIds.has(row.id)} onChange={() => toggleRow(row.id)} /></td>
                   {shopConfig.inventoryListColumns.map((col) => {
                     const editable = col.editable && row.status !== 'Sold';

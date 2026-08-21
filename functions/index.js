@@ -82,7 +82,18 @@ exports.generateInvoicePdfAndSend = onCall({ secrets: TWILIO_SECRETS }, async (r
   const bucket = admin.storage().bucket();
   const filePath = `invoices/${data.invoiceId}.pdf`;
   const file = bucket.file(filePath);
-  await file.save(pdfBuffer, { contentType: 'application/pdf' });
+  // A Firebase Storage download token (rather than a v4 getSignedUrl()) is
+  // used to serve this file below — signed URLs require the Cloud Functions
+  // runtime service account to hold the `iam.serviceAccounts.signBlob`
+  // permission, which it doesn't have by default and isn't granted anywhere
+  // in this project, so getSignedUrl() would throw on every request. A
+  // download token needs no such IAM grant and, like a signed URL, bypasses
+  // storage.rules — it's the same mechanism getDownloadURL() uses client-side.
+  const downloadToken = crypto.randomUUID();
+  await file.save(pdfBuffer, {
+    contentType: 'application/pdf',
+    metadata: { metadata: { firebaseStorageDownloadTokens: downloadToken } }
+  });
 
   // The buyer-facing link points at viewInvoicePdf (below), which enforces
   // the 6-month window and the access token itself — this URL is stable and
@@ -128,8 +139,8 @@ exports.generateInvoicePdfAndSend = onCall({ secrets: TWILIO_SECRETS }, async (r
 //   1. the random token, so guessing/enumerating invoiceId isn't enough
 //      (invoiceId itself is just the last 8 digits of a timestamp), and
 //   2. the 6-month window from the invoice's createdAtMillis.
-// A passing request gets redirected to a short-lived (5 min) signed URL —
-// that URL is single-use-ish and not what's ever shared with the buyer.
+// A passing request gets redirected to Firebase Storage's token-authorized
+// download URL — that URL is not what's ever shared with the buyer directly.
 exports.viewInvoicePdf = onRequest(async (req, res) => {
   const invoiceId = String(req.query.invoiceId || '');
   const token = String(req.query.token || '');
@@ -154,15 +165,20 @@ exports.viewInvoicePdf = onRequest(async (req, res) => {
     return;
   }
 
-  const file = admin.storage().bucket().file(`invoices/${invoiceId}.pdf`);
-  const [exists] = await file.exists();
-  if (!exists) {
+  const bucket = admin.storage().bucket();
+  const file = bucket.file(`invoices/${invoiceId}.pdf`);
+  const [metadata] = await file.getMetadata().catch(() => [null]);
+  const downloadToken = metadata?.metadata?.firebaseStorageDownloadTokens?.split(',')[0];
+  if (!downloadToken) {
     res.status(404).send('Invoice PDF not found.');
     return;
   }
 
-  const [signedUrl] = await file.getSignedUrl({ action: 'read', expires: Date.now() + 5 * 60 * 1000 });
-  res.redirect(302, signedUrl);
+  // Firebase Storage's own download endpoint, authorized by the token saved
+  // alongside the file (see generateInvoicePdfAndSend) — no signBlob IAM
+  // permission required, unlike a v4 getSignedUrl().
+  const downloadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket.name}/o/${encodeURIComponent(file.name)}?alt=media&token=${downloadToken}`;
+  res.redirect(302, downloadUrl);
 });
 
 // ---- sendWhatsappMarketing --------------------------------------------------

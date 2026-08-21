@@ -4,6 +4,7 @@ import shopConfig from '../config/shopConfig';
 import { subscribeSales, subscribeInvoices } from '../utils/firestoreHelpers';
 import { calcProfit, formatCurrency } from '../utils/calculations';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
+import { exportRowsToCsv } from '../utils/exportCsv';
 
 const COLORS = ['#1f5fb5', '#c19a5a', '#1f7a5e', '#8a6fae', '#c92d39', '#3f6b8a'];
 const PAGE_SIZE_OPTIONS = [10, 20, 50, 100];
@@ -138,6 +139,22 @@ export default function SalesSummaryPage() {
     if (page > totalPages - 1) setPage(Math.max(0, totalPages - 1));
   }, [totalPages, page]);
 
+  // Exports every row matching the current filters (all pages), not just
+  // the page currently on screen.
+  function handleExportCsv() {
+    const columns = shopConfig.salesColumns.map((col) => ({
+      label: col.label,
+      get: (s) => {
+        if (col.key === 'invoiceId') return s.invoiceId || s.invoiceRef || '';
+        if (col.key === 'onlinePurchase') return s.onlinePurchase ? 'Yes' : 'No';
+        if (col.key === 'profit') return calcProfit(s.soldPrice, s.cost);
+        if (col.key === 'soldDate') return s.soldDateMillis ? new Date(s.soldDateMillis).toLocaleDateString() : '';
+        return s[col.key] ?? '';
+      }
+    }));
+    exportRowsToCsv('sales-export', columns, detailRows);
+  }
+
   return (
     <div>
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 24, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -241,6 +258,9 @@ export default function SalesSummaryPage() {
       <div className="panel">
         <div className="panel-title-row">
           <h2>Sales Detail ({detailRows.length})</h2>
+          <button type="button" className="btn btn-secondary" onClick={handleExportCsv} disabled={detailRows.length === 0}>
+            Export CSV
+          </button>
         </div>
         <div className="summary-table-wrapper">
           <table className="data-table wide excel-table">
