@@ -32,7 +32,7 @@ const shopConfig = {
   // Invoice, and the Summary filter. Every item is stored in a single
   // Firestore collection ("inventory") with a `category` field — this
   // array just drives the dropdown, it does not create new collections.
-  categories: ['Necklace', 'Bracelet', 'Ring', 'Earring', 'Earring', 'Bangle', 'Anklet', 'Tikli'],
+  categories: ['Necklace', 'Bracelet', 'FingerRing', 'Earring', 'Bangle', 'Anklet', 'Tikli'],
 
   // ---- Lot tracking ------------------------------------------------------
   // Categories listed here skip individual barcodes. Instead of creating
@@ -46,18 +46,18 @@ const shopConfig = {
   // physical piece isn't practical. Leave a category out of this list to
   // keep the original one-barcode-per-piece behavior (better for higher
   // value pieces you want individually traceable, e.g. necklaces).
-  lotTrackedCategories: ['Necklace', 'Bracelet', 'Ring', 'Earring', 'Bangle', 'Anklet', 'Tikli'],
+  lotTrackedCategories: ['Necklace', 'Bracelet', 'FingerRing', 'Earring', 'Bangle', 'Anklet', 'Tikli' ],
 
   // ---- Type dropdown, scoped per category ------------------------------
   // Key = category name, Value = list of type options for that category.
   // Add a `_default` key to fall back on when a category isn't listed.
   types: {
-    Necklace: ['AD', 'Kundan', 'Temple', 'Beaded', 'Chain', 'Glass Stone', 'Silver Replica', 'Jarawa', 'Anti Tarnish'],
-    Bracelet: ['Cuff', 'Chain', 'Beaded', 'Charm', 'Jarawa',  'AD', 'Anti Tarnish', 'Glass Stone', 'Jarawa'],
-    Ring: ['Solitaire', 'Band', 'Cocktail', 'Stackable'],
-    Earring: ['Stud', 'Hoop', 'Jhumka', 'Danglers',  'AD', 'Anti Tarnish'],
-    Bangle: ['Classic', 'Kada', 'Cuff'],
-    Anklet: ['Chain', 'Beaded'],
+    Necklace: ['AD', 'Kundan', 'Temple', 'Beaded', 'Chain', 'Glass Stone', 'Silver Replica', 'Jarawa', 'Anti Tarnish', 'Shree Hari'],
+    Bracelet: ['Cuff', 'Chain', 'Beaded', 'Charm', 'Jarawa',  'AD', 'Anti Tarnish', 'Glass Stone', 'Jarawa', 'Shree Hari'],
+    Ring: ['Solitaire', 'Band', 'Cocktail', 'Stackable', 'Shree Hari'],
+    Earring: ['Stud', 'Hoop', 'Jhumka', 'Danglers',  'AD', 'Anti Tarnish', 'Shree Hari'],
+    Bangle: ['Classic', 'Kada', 'Cuff', 'Shree Hari', 'Sakha', 'Pola'],
+    Anklet: ['Chain', 'Beaded', 'Shree Hari'],
     _default: ['General']
   },
 
@@ -72,7 +72,8 @@ const shopConfig = {
     'Rajwada Ethnic',
     'Delhi',
     'Kolkata-6',
-    'Kolkata-c-25'
+    'Kolkata-c-25',
+    'Shree Hari'
   ],
 
   // ---- Payment modes (Invoice page) --------------------------------------
