@@ -55,7 +55,7 @@ const shopConfig = {
     Necklace: ['AD', 'Kundan', 'Temple', 'Beaded', 'Chain', 'Glass Stone', 'Silver Replica', 'Jarawa', 'Anti Tarnish', 'Shree Hari', 'Chocker'],
     Bracelet: ['Cuff', 'Chain', 'Beaded', 'Charm', 'Jarawa',  'AD', 'Anti Tarnish', 'Glass Stone', 'Jarawa', 'Shree Hari', 'Meena Kari'],
     Ring: ['Solitaire', 'Band', 'Cocktail', 'Stackable', 'Shree Hari'],
-    Earring: ['Stud', 'Hoop', 'Jhumka', 'Danglers',  'AD', 'Anti Tarnish', 'Shree Hari'],
+    Earring: ['Stud', 'Hoop', 'Jhumka', 'Danglers',  'AD', 'Anti Tarnish', 'Shree Hari', 'Western'],
     Bangle: ['Classic', 'Kada', 'Cuff', 'Shree Hari', 'Sakha', 'Pola'],
     Anklet: ['Chain', 'Beaded', 'Shree Hari'],
     _default: ['General']
