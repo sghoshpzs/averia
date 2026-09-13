@@ -64,6 +64,25 @@ jobs:
           channelId: live
           projectId: averia-jewelry
 
+  # Firestore/Storage rules were previously never redeployed by CI (only
+  # hosting and functions were) — the checked-in firestore.rules/storage.rules
+  # silently diverged from what was actually enforced in production, causing
+  # "Missing or insufficient permissions" errors even though the app and the
+  # rules file both looked correct. Deployed on every push, same as hosting.
+  deploy_rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - name: Set up service account credentials
+        run: |
+          echo '${{ secrets.FIREBASE_FUNCTIONS_DEPLOY_KEY }}' > "$RUNNER_TEMP/service-account.json"
+      - name: Deploy Firestore and Storage rules
+        run: npx firebase-tools deploy --only firestore:rules,storage --project averia-jewelry --non-interactive
+        env:
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/service-account.json
+
   deploy_functions:
     needs: detect-changes
     if: needs.detect-changes.outputs.functions == 'true' || github.event_name == 'workflow_dispatch'

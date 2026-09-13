@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import shopConfig from '../config/shopConfig';
 import { subscribeSales, subscribeInvoices } from '../utils/firestoreHelpers';
-import { calcProfit, formatCurrency, formatDate } from '../utils/calculations';
+import { calcProfit, formatCurrency, formatDate, sortAsc } from '../utils/calculations';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
 import { exportRowsToCsv } from '../utils/exportCsv';
 
@@ -95,9 +95,9 @@ export default function SalesSummaryPage() {
   }
 
   const filterOptions = (col) => {
-    if (col.source === 'yesNo') return shopConfig.yesNo;
+    if (col.source === 'yesNo') return sortAsc(shopConfig.yesNo);
     const source = shopConfig[col.source];
-    return Array.isArray(source) ? source : [];
+    return Array.isArray(source) ? sortAsc(source) : [];
   };
 
   const detailRows = useMemo(() => {
@@ -171,7 +171,7 @@ export default function SalesSummaryPage() {
             <label>Category</label>
             <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(0); }}>
               <option value="All">All</option>
-              {shopConfig.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              {sortAsc(shopConfig.categories).map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>

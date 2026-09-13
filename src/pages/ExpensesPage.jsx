@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import shopConfig from '../config/shopConfig';
 import { subscribeExpenses, addExpense, deleteExpenses } from '../utils/firestoreHelpers';
-import { formatCurrency, formatDate } from '../utils/calculations';
+import { formatCurrency, formatDate, sortAsc } from '../utils/calculations';
 import { isSuperUser } from '../utils/auth';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
 import { exportRowsToCsv } from '../utils/exportCsv';
@@ -119,7 +119,7 @@ export default function ExpensesPage() {
             <label>Category</label>
             <select value={categoryFilter} onChange={(e) => setCategoryFilter(e.target.value)}>
               <option value="All">All</option>
-              {shopConfig.expenseCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+              {sortAsc(shopConfig.expenseCategories).map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>
@@ -135,7 +135,7 @@ export default function ExpensesPage() {
           <div className="field">
             <label>Category</label>
             <select value={form.category} onChange={(e) => setForm((f) => ({ ...f, category: e.target.value }))}>
-              {shopConfig.expenseCategories.map((c) => <option key={c} value={c}>{c}</option>)}
+              {sortAsc(shopConfig.expenseCategories).map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div className="field">

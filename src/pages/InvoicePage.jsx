@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { httpsCallable } from 'firebase/functions';
 import shopConfig from '../config/shopConfig';
 import BarcodeScanner from '../components/BarcodeScanner';
-import { calcFinalPrice, formatCurrency } from '../utils/calculations';
+import { calcFinalPrice, formatCurrency, formatDate, sortAsc } from '../utils/calculations';
 import { findInventoryByRowId, checkoutInvoice, upsertCustomerOnPurchase, findCustomerByPhone, reserveInvoiceId } from '../utils/firestoreHelpers';
 import { functions } from '../firebase';
 
@@ -43,9 +43,11 @@ export default function InvoicePage() {
   const [onlinePurchase, setOnlinePurchase] = useState(false);
   const [address, setAddress] = useState(emptyAddress);
   const [paymentMode, setPaymentMode] = useState('');
+  const [invoiceDate, setInvoiceDate] = useState(() => formatDate(new Date()));
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState(null);
   const [invoiceId, setInvoiceId] = useState(reserveInvoiceId);
+  const barcodeInputRef = useRef(null);
 
   async function lookupBarcode(barcode) {
     setDraft((d) => ({ ...d, barcode, barcodeError: null }));
@@ -132,6 +134,10 @@ export default function InvoicePage() {
     const finalPrice = calcFinalPrice(draft.printedPrice, draft.discountPercent);
     setItems((prev) => [...prev, { ...draft, quantity: qty, finalPrice, id: `${draft.barcode}-${Date.now()}` }]);
     setDraft(emptyDraft);
+    // Cashier's next action is almost always scanning/typing the next item,
+    // so send focus straight back to Barcode instead of leaving it wherever
+    // the mouse happened to be (the Add to Cart button).
+    barcodeInputRef.current?.focus();
   }
 
   function removeItem(id) {
@@ -144,6 +150,9 @@ export default function InvoicePage() {
   // Looked up once the cashier finishes typing the phone number — auto-fills
   // name/email for a returning customer instead of re-typing them and
   // accidentally creating a second customer record under the same phone.
+  // This is purely a Firestore lookup of the `customers` collection — it has
+  // nothing to do with WhatsApp/SMS delivery, which only happens later, at
+  // checkout, via the generateInvoicePdfAndSend Cloud Function.
   async function handlePhoneBlur() {
     const phone = customerPhone.trim();
     if (!phone) {
@@ -151,14 +160,21 @@ export default function InvoicePage() {
       return;
     }
     setCustomerLookup('checking');
-    const existing = await findCustomerByPhone(phone);
-    if (existing) {
-      setCustomerName(existing.name || '');
-      setCustomerEmail((prev) => prev || existing.email || '');
-      setMatchedPhone(phone);
-      setCustomerLookup('found');
-    } else {
-      setCustomerLookup('new');
+    try {
+      const existing = await findCustomerByPhone(phone);
+      if (existing) {
+        setCustomerName(existing.name || '');
+        setCustomerEmail((prev) => prev || existing.email || '');
+        setMatchedPhone(phone);
+        setCustomerLookup('found');
+      } else {
+        setCustomerLookup('new');
+      }
+    } catch (err) {
+      // Without this, a failed lookup (permissions, offline, etc.) left the
+      // banner stuck on "Looking up customer…" forever with no way to tell
+      // it had actually failed.
+      setCustomerLookup('error');
     }
   }
 
@@ -178,6 +194,10 @@ export default function InvoicePage() {
     }
     if (!paymentMode) {
       setResult({ type: 'error', text: 'Please select a payment mode.' });
+      return;
+    }
+    if (!invoiceDate) {
+      setResult({ type: 'error', text: 'Please enter an invoice date.' });
       return;
     }
     if (onlinePurchase) {
@@ -226,7 +246,8 @@ export default function InvoicePage() {
           customerEmail: customerEmail || null,
           onlinePurchase,
           address: onlinePurchase ? address : null,
-          paymentMode
+          paymentMode,
+          invoiceDate
         },
         invoiceId
       );
@@ -250,7 +271,8 @@ export default function InvoicePage() {
           total: cartTotal,
           customerName,
           customerPhone,
-          paymentMode
+          paymentMode,
+          invoiceDate
         });
         const { pdfUrl, whatsappSent, whatsappError, pdfBase64 } = res?.data || {};
 
@@ -297,6 +319,7 @@ export default function InvoicePage() {
       setOnlinePurchase(false);
       setAddress(emptyAddress);
       setPaymentMode('');
+      setInvoiceDate(formatDate(new Date()));
       setInvoiceId(reserveInvoiceId());
     } catch (err) {
       setResult({ type: 'error', text: err.message || 'Checkout failed.' });
@@ -316,6 +339,7 @@ export default function InvoicePage() {
             <label>Barcode</label>
             <div className="barcode-input-row">
               <input
+                ref={barcodeInputRef}
                 type="text"
                 value={draft.barcode}
                 onChange={(e) => handleBarcodeChange(e.target.value)}
@@ -335,7 +359,7 @@ export default function InvoicePage() {
               className={activated ? 'opaque' : ''}
             >
               <option value="" disabled>Select category</option>
-              {shopConfig.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              {sortAsc(shopConfig.categories).map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
           <div className="field">
@@ -347,7 +371,7 @@ export default function InvoicePage() {
               className={activated ? 'opaque' : ''}
             >
               <option value="" disabled>Select type</option>
-              {(shopConfig.types[draft.category] || shopConfig.types._default).map((t) => <option key={t} value={t}>{t}</option>)}
+              {sortAsc(shopConfig.types[draft.category] || shopConfig.types._default).map((t) => <option key={t} value={t}>{t}</option>)}
             </select>
           </div>
           {draft.isLot && (
@@ -403,8 +427,9 @@ export default function InvoicePage() {
         <div className="panel">
           <h2>Cart ({items.length})</h2>
           <div className="line-items">
-            {items.map((i) => (
+            {items.map((i, idx) => (
               <div key={i.id} className="line-item-row detailed">
+                <div className="line-item-cell"><span className="cell-label">#</span><span className="cell-value">{idx + 1}</span></div>
                 <div className="line-item-cell"><span className="cell-label">Barcode</span><span className="cell-value">{i.barcode}</span></div>
                 <div className="line-item-cell"><span className="cell-label">Category</span><span className="cell-value">{i.category}</span></div>
                 <div className="line-item-cell"><span className="cell-label">Type</span><span className="cell-value">{i.type}</span></div>
@@ -428,6 +453,14 @@ export default function InvoicePage() {
             <input type="text" readOnly value={invoiceId} className="opaque" />
           </div>
           <div className="field">
+            <label>Date</label>
+            <input
+              type="date"
+              value={invoiceDate}
+              onChange={(e) => setInvoiceDate(e.target.value)}
+            />
+          </div>
+          <div className="field">
             <label>Customer Phone (WhatsApp)</label>
             <input
               type="text"
@@ -448,9 +481,10 @@ export default function InvoicePage() {
               onBlur={handlePhoneBlur}
               placeholder="+91XXXXXXXXXX"
             />
-            {customerLookup === 'checking' && <p className="muted" style={{ margin: '4px 0 0' }}>Checking…</p>}
+            {customerLookup === 'checking' && <p className="muted" style={{ margin: '4px 0 0' }}>Looking up customer…</p>}
             {customerLookup === 'found' && <p className="muted" style={{ margin: '4px 0 0' }}>Existing customer — name filled in below.</p>}
             {customerLookup === 'new' && <p className="muted" style={{ margin: '4px 0 0' }}>New customer — enter their name below.</p>}
+            {customerLookup === 'error' && <p className="muted" style={{ margin: '4px 0 0', color: '#b3372c' }}>Couldn't look up this customer — enter their name below and continue.</p>}
           </div>
           <div className="field">
             <label>Email ID</label>
@@ -464,7 +498,7 @@ export default function InvoicePage() {
             <label>Payment Mode</label>
             <select value={paymentMode} onChange={(e) => setPaymentMode(e.target.value)}>
               <option value="" disabled>Select payment mode</option>
-              {shopConfig.paymentModes.map((m) => <option key={m} value={m}>{m}</option>)}
+              {sortAsc(shopConfig.paymentModes).map((m) => <option key={m} value={m}>{m}</option>)}
             </select>
           </div>
           <div className="field">

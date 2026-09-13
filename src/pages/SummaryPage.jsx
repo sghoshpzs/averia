@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import shopConfig from '../config/shopConfig';
 import { subscribeInventory, updateInventoryDoc, markPrinted, deleteInventoryDocs } from '../utils/firestoreHelpers';
-import { calcPrintedPrice, formatCurrency, formatDate } from '../utils/calculations';
+import { calcPrintedPrice, formatCurrency, formatDate, sortAsc } from '../utils/calculations';
 import { isSuperUser } from '../utils/auth';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
 import { exportRowsToCsv } from '../utils/exportCsv';
@@ -106,13 +106,13 @@ export default function SummaryPage() {
 
   const filterOptions = (col) => {
     if (col.key === 'type') {
-      return Array.from(new Set(Object.values(shopConfig.types).flat())).sort();
+      return sortAsc(Array.from(new Set(Object.values(shopConfig.types).flat())));
     }
     if (col.key === 'vendor') {
-      return shopConfig.vendors;
+      return sortAsc(shopConfig.vendors);
     }
     const source = shopConfig[col.source];
-    return Array.isArray(source) ? source : [];
+    return Array.isArray(source) ? sortAsc(source) : [];
   };
 
   const detailRows = useMemo(() => {
@@ -257,7 +257,7 @@ export default function SummaryPage() {
             <label>Category</label>
             <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(0); }}>
               <option value="All">All</option>
-              {shopConfig.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+              {sortAsc(shopConfig.categories).map((c) => <option key={c} value={c}>{c}</option>)}
             </select>
           </div>
         </div>

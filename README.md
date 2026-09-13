@@ -138,7 +138,11 @@ Deploys normally happen automatically via GitHub Actions on push to `main` — s
 1. Build assets: `npm run build`
 2. Deploy hosting, functions and security rules:
 
-   firebase deploy --only hosting,functions,firestore:rules,storage:rules
+   firebase deploy --only hosting,functions,firestore:rules,storage
+
+   (`storage`, not `storage:rules` — this project's `firebase.json` doesn't
+   define a named storage target, so `storage:rules` fails with "Could not
+   find rules for the following storage targets: rules".)
 
 ### Cloud Functions Gen 2 — one-time IAM setup
 

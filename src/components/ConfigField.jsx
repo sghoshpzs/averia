@@ -1,4 +1,5 @@
 import shopConfig, { resolveDropdownSource } from '../config/shopConfig';
+import { sortAsc } from '../utils/calculations';
 
 // Renders one input based on a field definition from shopConfig.
 // Supports: category, dropdown, text, number, readonly. Barcode/lookupEditable
@@ -12,14 +13,14 @@ export default function ConfigField({ field, value, onChange, formValues, disabl
         <label>{field.label}</label>
         <select value={value ?? ''} onChange={handle} disabled={disabled} className={className || ''}>
           <option value="" disabled>Select category</option>
-          {shopConfig.categories.map((c) => <option key={c} value={c}>{c}</option>)}
+          {sortAsc(shopConfig.categories).map((c) => <option key={c} value={c}>{c}</option>)}
         </select>
       </div>
     );
   }
 
   if (field.type === 'dropdown') {
-    const options = resolveDropdownSource(field, formValues);
+    const options = sortAsc(resolveDropdownSource(field, formValues));
     return (
       <div className="field">
         <label>{field.label}</label>

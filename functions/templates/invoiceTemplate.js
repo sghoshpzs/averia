@@ -64,7 +64,7 @@ function drawInstagramIcon(doc, x, y, size, url) {
 }
 
 function drawInvoice(doc, data) {
-  const { invoiceId, items, total, customerName, customerPhone, paymentMode, address, onlinePurchase } = data;
+  const { invoiceId, items, total, customerName, customerPhone, paymentMode, address, onlinePurchase, invoiceDate } = data;
 
   // --- Header ---
   const hasLogo = fs.existsSync(LOGO_PATH);
@@ -99,7 +99,10 @@ function drawInvoice(doc, data) {
 
   doc.fillColor(INK).fontSize(14).text('INVOICE', 400, 44, { align: 'right' });
   doc.fillColor(MUTED).fontSize(9).text(`Invoice #: ${invoiceId}`, 400, 64, { align: 'right' });
-  doc.text(`Date: ${formatDate(new Date())}`, 400, 78, { align: 'right' });
+  // invoiceDate is already YYYY-MM-DD from the client (InvoicePage's date
+  // picker, defaulted to today but editable for backdated entries) — only
+  // fall back to today here for calls that predate that field.
+  doc.text(`Date: ${invoiceDate || formatDate(new Date())}`, 400, 78, { align: 'right' });
 
   const dividerY = Math.max(iconY + iconSize + 14, 108);
   doc.moveTo(40, dividerY).lineTo(555, dividerY).strokeColor('#dddddd').stroke();
