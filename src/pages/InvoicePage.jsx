@@ -36,7 +36,8 @@ export default function InvoicePage() {
   const [lookingUp, setLookingUp] = useState(false);
   const [items, setItems] = useState([]);
   const [customerName, setCustomerName] = useState('');
-  const [customerPhone, setCustomerPhone] = useState('');
+  const [phoneExt, setPhoneExt] = useState('+91');
+  const [phoneNumber, setPhoneNumber] = useState('');
   const [customerEmail, setCustomerEmail] = useState('');
   const [customerLookup, setCustomerLookup] = useState(null); // null | 'checking' | 'found' | 'new'
   const [matchedPhone, setMatchedPhone] = useState(null); // phone the current name/email auto-fill came from
@@ -48,6 +49,27 @@ export default function InvoicePage() {
   const [result, setResult] = useState(null);
   const [invoiceId, setInvoiceId] = useState(reserveInvoiceId);
   const barcodeInputRef = useRef(null);
+
+  // Combined phone stored/looked-up everywhere (Firestore, WhatsApp) — kept
+  // as one string like before ("+91XXXXXXXXXX"), just entered as two fields.
+  // Empty unless a local number has actually been typed, so validation and
+  // stale-match checks below don't treat a bare "+91" as a real phone.
+  const customerPhone = phoneNumber.trim() ? `${phoneExt.trim()}${phoneNumber.trim()}` : '';
+
+  function handlePhoneFieldChange(nextExt, nextNumber) {
+    setPhoneExt(nextExt);
+    setPhoneNumber(nextNumber);
+    setCustomerLookup(null);
+    // The name/email currently shown came from a lookup match on the OLD
+    // phone number — clear them so a stale match doesn't silently get
+    // attached to a different phone at checkout.
+    const nextFull = nextNumber.trim() ? `${nextExt.trim()}${nextNumber.trim()}` : '';
+    if (matchedPhone && nextFull !== matchedPhone) {
+      setCustomerName('');
+      setCustomerEmail('');
+      setMatchedPhone(null);
+    }
+  }
 
   async function lookupBarcode(barcode) {
     setDraft((d) => ({ ...d, barcode, barcodeError: null }));
@@ -312,7 +334,8 @@ export default function InvoicePage() {
 
       setItems([]);
       setCustomerName('');
-      setCustomerPhone('');
+      setPhoneExt('+91');
+      setPhoneNumber('');
       setCustomerEmail('');
       setCustomerLookup(null);
       setMatchedPhone(null);
@@ -462,25 +485,23 @@ export default function InvoicePage() {
           </div>
           <div className="field">
             <label>Customer Phone (WhatsApp)</label>
-            <input
-              type="text"
-              value={customerPhone}
-              onChange={(e) => {
-                const next = e.target.value;
-                setCustomerPhone(next);
-                setCustomerLookup(null);
-                // The name/email currently shown came from a lookup match on
-                // the OLD phone number — clear them so a stale match doesn't
-                // silently get attached to a different phone at checkout.
-                if (matchedPhone && next.trim() !== matchedPhone) {
-                  setCustomerName('');
-                  setCustomerEmail('');
-                  setMatchedPhone(null);
-                }
-              }}
-              onBlur={handlePhoneBlur}
-              placeholder="+91XXXXXXXXXX"
-            />
+            <div className="phone-input-row">
+              <input
+                type="text"
+                className="phone-ext"
+                value={phoneExt}
+                onChange={(e) => handlePhoneFieldChange(e.target.value, phoneNumber)}
+                placeholder="+91"
+              />
+              <input
+                type="text"
+                className="phone-number"
+                value={phoneNumber}
+                onChange={(e) => handlePhoneFieldChange(phoneExt, e.target.value)}
+                onBlur={handlePhoneBlur}
+                placeholder="XXXXXXXXXX"
+              />
+            </div>
             {customerLookup === 'checking' && <p className="muted" style={{ margin: '4px 0 0' }}>Looking up customer…</p>}
             {customerLookup === 'found' && <p className="muted" style={{ margin: '4px 0 0' }}>Existing customer — name filled in below.</p>}
             {customerLookup === 'new' && <p className="muted" style={{ margin: '4px 0 0' }}>New customer — enter their name below.</p>}

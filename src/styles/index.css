@@ -342,6 +342,11 @@ table.data-table.excel-table tbody tr.row-sold:hover td {
 /* ---- Barcode field with inline camera-icon scan ---- */
 .barcode-input-row { display: flex; gap: 8px; align-items: stretch; }
 .barcode-input-row input { flex: 1; }
+
+/* ---- Customer phone: country-code extension + local number ---- */
+.phone-input-row { display: flex; gap: 8px; align-items: stretch; }
+.phone-input-row .phone-ext { flex: 0 0 60px; text-align: center; }
+.phone-input-row .phone-number { flex: 1; }
 .barcode-scan-icon-btn {
   flex: 0 0 auto; width: 40px; background: var(--surface); border: 1px solid var(--hairline); border-radius: var(--radius-sm);
   cursor: pointer; font-size: 16px; display: flex; align-items: center; justify-content: center;

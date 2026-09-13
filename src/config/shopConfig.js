@@ -159,7 +159,7 @@ const shopConfig = {
   statuses: ['In-Stock', 'Printed', 'Sold'],
 
   // ---- Ad-Hoc Expenses -----------------------------------------------
-  expenseCategories: ['Rent', 'Electricity Bill', 'Repair Work', 'Online Promotion', 'Decoration', 'Accessories',  'Other'],
+  expenseCategories: ['Rent', 'Electricity Bill', 'Repair Work', 'Online Promotion', 'Offline Promotion', 'Decoration', 'Accessories',  'Others', 'Mobile Bill', 'Water Bill', 'Courier Charges', 'Stationary', 'GST', 'Salary', 'Miscellaneous', 'Internet Charges', 'Website Maintenance', 'Software Subscription', 'Travel Expenses', 'Bank Charges', 'Legal Fees', 'Insurance Premiums', 'Professional Services', 'Training and Development', 'Office Supplies', 'Marketing Materials', 'Printing Costs', 'Event Sponsorships', 'Charity Donations'],
 
   expenseColumns: [
     { key: 'date', label: 'Date', filter: 'date' },
