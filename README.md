@@ -153,11 +153,29 @@ The Cloud Functions here (`generateInvoicePdfAndSend`, `viewInvoicePdf`, `sendWh
 3. Add the deploying principal (your Google account email, and/or the CI deploy service account's email) with role **Service Account User**.
 4. Save, then re-run the deploy.
 
+### Storage rules deploy — one-time IAM setup
+
+`firebase deploy --only storage` (deployed by CI's `deploy_rules` job on every push, and by the manual command in [Deploy](#deploy) above) needs to resolve the project's default Storage bucket first, which requires the `firebasestorage.defaultBucket.get` permission. The CI deploy identity (`firebase-adminsdk-fbsvc@averia-jewelry.iam.gserviceaccount.com` — the account behind the `FIREBASE_FUNCTIONS_DEPLOY_KEY` secret) doesn't have it by default, so this step fails with:
+
+```
+Error: Request to https://firebasestorage.googleapis.com/v1alpha/projects/averia-jewelry/defaultBucket had HTTP Error: 403,
+Permission 'firebasestorage.defaultBucket.get' denied on resource '//firebasestorage.googleapis.com/projects/averia-jewelry/defaultBucket'
+```
+
+One-time grant to fix it:
+
+1. Google Cloud Console → **IAM & Admin → IAM** (the project-level page this time, not a single service account's Permissions tab).
+2. **Grant Access**.
+3. New principal: `firebase-adminsdk-fbsvc@averia-jewelry.iam.gserviceaccount.com` (or whichever account's key is in `FIREBASE_FUNCTIONS_DEPLOY_KEY`/used for local manual deploys).
+4. Role: **Firebase Storage Admin** (`roles/firebasestorage.admin`).
+5. Save, then re-run the deploy/workflow.
+
 ## CI/CD (GitHub Actions)
 
 `.github/workflows/firebase-deploy.yml` deploys on every push to `main`:
 
 - **Hosting** rebuilds and deploys on every push.
+- **Firestore/Storage rules** (`deploy_rules` job) redeploy on every push, same as hosting — see the Storage rules IAM note above if this job fails with a `firebasestorage.defaultBucket.get` 403.
 - **Cloud Functions** redeploy only when `functions/**` changed (or via manual "Run workflow" dispatch), so an unrelated frontend change doesn't trigger a functions redeploy.
 
 Required repo secrets (Settings → Secrets and variables → Actions):
@@ -167,7 +185,7 @@ Required repo secrets (Settings → Secrets and variables → Actions):
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID` | Baked into the hosting build (same values as `.env`) |
 | `VITE_ALLOWED_ADMINS`, `VITE_ALLOWED_WORKERS` | Baked into the hosting build (same as `.env`) |
 | `FIREBASE_SERVICE_ACCOUNT_AVERIA_JEWELRY` | Hosting deploy credential |
-| `FIREBASE_FUNCTIONS_DEPLOY_KEY` | Full JSON of a service account key with Cloud Functions deploy rights — see the IAM note above, this identity also needs `roles/iam.serviceAccountUser` on the compute service account |
+| `FIREBASE_FUNCTIONS_DEPLOY_KEY` | Full JSON of a service account key, reused for both Cloud Functions deploys and the `deploy_rules` job — see the IAM notes above: needs `roles/iam.serviceAccountUser` on the compute service account, and `roles/firebasestorage.admin` at the project level |
 | `SHOP_NAME`, `SHOP_ADDRESS`, `SHOP_PHONE`, `SHOP_EMAIL` | Written into `functions/.env` at deploy time (see `functions/.env.example`) |
 
 Twilio secrets (`TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`) are **not** managed by this workflow — they live in Google Secret Manager already (set via `firebase functions:secrets:set`, see [Firebase setup](#firebase-setup)) and are read directly by the functions at runtime.

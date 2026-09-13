@@ -293,6 +293,15 @@ export async function findCustomerByPhone(phone) {
   return { id: d.id, ...d.data() };
 }
 
+// Used by CustomersPage's Edit button to correct a name/phone typo after the
+// fact — this does NOT re-check for a matching phone the way
+// upsertCustomerOnPurchase does, so editing one customer's phone to match
+// another existing customer's would leave two separate records rather than
+// merging them.
+export async function updateCustomer(docId, patch) {
+  await updateDoc(doc(db, shopConfig.collections.customers, docId), patch);
+}
+
 // Creates the customer if new, or increments totals if they already exist
 // (matched by phone number). Called from the invoice checkout flow.
 export async function upsertCustomerOnPurchase({ name, phone, email, address }, invoiceAmount, invoiceRef) {
