@@ -52,7 +52,7 @@ const shopConfig = {
   // Key = category name, Value = list of type options for that category.
   // Add a `_default` key to fall back on when a category isn't listed.
   types: {
-    Necklace: ['AD', 'Kundan', 'Temple', 'Beaded', 'Chain', 'Glass Stone', 'Silver Replica', 'Jarawa', 'Anti Tarnish', 'Shree Hari'],
+    Necklace: ['AD', 'Kundan', 'Temple', 'Beaded', 'Chain', 'Glass Stone', 'Silver Replica', 'Jarawa', 'Anti Tarnish', 'Shree Hari', 'Chocker'],
     Bracelet: ['Cuff', 'Chain', 'Beaded', 'Charm', 'Jarawa',  'AD', 'Anti Tarnish', 'Glass Stone', 'Jarawa', 'Shree Hari'],
     Ring: ['Solitaire', 'Band', 'Cocktail', 'Stackable', 'Shree Hari'],
     Earring: ['Stud', 'Hoop', 'Jhumka', 'Danglers',  'AD', 'Anti Tarnish', 'Shree Hari'],
