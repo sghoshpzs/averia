@@ -135,14 +135,14 @@ export default function App() {
     <HashRouter>
       <Routes>
         <Route element={<Layout role={role} user={user} />}>
-          <Route index element={<Navigate to={role === 'worker' ? '/invoice' : '/inventory'} replace />} />
+          <Route index element={<Navigate to="/invoice" replace />} />
           <Route path="/inventory" element={routeAccess['/inventory'].includes(role) ? <InventoryPage /> : <AccessDeniedScreen userEmail={user.email} onSignOut={handleSignOut} />} />
           <Route path="/invoice" element={routeAccess['/invoice'].includes(role) ? <InvoicePage /> : <AccessDeniedScreen userEmail={user.email} onSignOut={handleSignOut} />} />
           <Route path="/summary" element={routeAccess['/summary'].includes(role) ? <SummaryPage /> : <AccessDeniedScreen userEmail={user.email} onSignOut={handleSignOut} />} />
           <Route path="/sales-summary" element={routeAccess['/sales-summary'].includes(role) ? <SalesSummaryPage /> : <AccessDeniedScreen userEmail={user.email} onSignOut={handleSignOut} />} />
           <Route path="/customers" element={routeAccess['/customers'].includes(role) ? <CustomersPage /> : <AccessDeniedScreen userEmail={user.email} onSignOut={handleSignOut} />} />
           <Route path="/expenses" element={routeAccess['/expenses'].includes(role) ? <ExpensesPage /> : <AccessDeniedScreen userEmail={user.email} onSignOut={handleSignOut} />} />
-          <Route path="*" element={<Navigate to={role === 'worker' ? '/invoice' : '/inventory'} replace />} />
+          <Route path="*" element={<Navigate to="/invoice" replace />} />
         </Route>
       </Routes>
     </HashRouter>

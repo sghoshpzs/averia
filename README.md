@@ -13,6 +13,7 @@ A lightweight single-page React application for managing a small jewellery shop:
 - [Quick start](#quick-start)
 - [Firebase setup](#firebase-setup)
 - [Twilio / WhatsApp setup](#twilio--whatsapp-setup)
+- [Google Contacts sync — one-time setup](#google-contacts-sync--one-time-setup)
 - [Configuration](#configuration)
 - [Development & build](#development--build)
 - [Deploy](#deploy)
@@ -105,6 +106,24 @@ A lightweight single-page React application for managing a small jewellery shop:
 - For local testing you can use Twilio's WhatsApp sandbox (Console → Messaging → Try it out). For production you must provision a WhatsApp-enabled number and register templates for marketing messages.
 - The app's Cloud Function expects Twilio credentials as secrets (see above).
 - Note: WhatsApp free-form messages are permitted only within 24 hours of a user's last message; marketing blasts require approved templates.
+
+## Google Contacts sync — one-time setup
+
+Every checkout in InvoicePage.jsx also syncs the customer (name, phone, email) into the shop's real Google Contacts, via the `syncGoogleContact` Cloud Function (`functions/googleContacts.js`) and the Google People API. It's free — no billing tier, just a generous default quota — but needs a one-time OAuth grant for whichever Google account should own these contacts (e.g. the shop's own account), since Contacts can't be accessed by Firebase's own service account.
+
+1. Google Cloud Console (same project as this Firebase app) → **APIs & Services → Library** → enable **Google People API**.
+2. **APIs & Services → Credentials → Create Credentials → OAuth client ID** → Application type **Desktop app**. Note the Client ID and Client Secret.
+3. `cd scripts && npm install googleapis` (one-time; not part of the app's own dependencies).
+4. `node get-google-contacts-token.js` — paste the Client ID/Secret, open the printed URL, sign in as the Google account that should own these contacts, and approve access. The script prints a refresh token.
+5. Set all three as Cloud Functions secrets, then redeploy:
+   ```
+   firebase functions:secrets:set GOOGLE_CONTACTS_CLIENT_ID
+   firebase functions:secrets:set GOOGLE_CONTACTS_CLIENT_SECRET
+   firebase functions:secrets:set GOOGLE_CONTACTS_REFRESH_TOKEN
+   firebase deploy --only functions
+   ```
+
+A sync failure never blocks or fails the checkout itself (invoice/inventory/PDF/WhatsApp all still go through) — it's surfaced as an appended note on the result banner, e.g. "Invoice saved and sent. (Google Contacts sync failed: ...)".
 
 ## Configuration
 

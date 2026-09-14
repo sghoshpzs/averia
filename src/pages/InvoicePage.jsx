@@ -278,13 +278,26 @@ export default function InvoicePage() {
       // above (see checkoutInvoice's comment for why). If this one call
       // fails, the sale/inventory are still correct; only the customer's
       // running total would need a manual nudge.
-      await upsertCustomerOnPurchase(
+      const customerId = await upsertCustomerOnPurchase(
         { name: customerName, phone: customerPhone, email: customerEmail || null, address: onlinePurchase ? address : null },
         cartTotal,
         invoiceId
       );
 
-      // 4. call Cloud Function to render PDF, upload to Storage, send WhatsApp via Twilio
+      // 4. best-effort sync of this customer into the shop's real Google
+      // Contacts (see functions/googleContacts.js + README for the one-time
+      // OAuth setup) — never blocks or fails the checkout; a sync failure
+      // just gets appended to whatever success/warning message is shown
+      // below instead of its own error path.
+      let contactSyncError = null;
+      try {
+        const syncGoogleContact = httpsCallable(functions, 'syncGoogleContact');
+        await syncGoogleContact({ customerId, name: customerName, phone: customerPhone, email: customerEmail || null });
+      } catch (syncErr) {
+        contactSyncError = syncErr.message || 'Google Contacts sync failed.';
+      }
+
+      // 5. call Cloud Function to render PDF, upload to Storage, send WhatsApp via Twilio
       try {
         const generateInvoice = httpsCallable(functions, 'generateInvoicePdfAndSend');
         const res = await generateInvoice({
@@ -330,6 +343,10 @@ export default function InvoicePage() {
           type: 'warn',
           text: `Invoice saved, but PDF/WhatsApp step failed: ${fnErr.message}. You can resend from the invoice record.`
         });
+      }
+
+      if (contactSyncError) {
+        setResult((r) => (r ? { ...r, text: `${r.text} (Google Contacts sync failed: ${contactSyncError})` } : r));
       }
 
       setItems([]);

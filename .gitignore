@@ -9,4 +9,5 @@ functions/.env.*
 *.log
 .agents/
 !.agents/skills.json
-scripts/
+scripts/*
+!scripts/get-google-contacts-token.js

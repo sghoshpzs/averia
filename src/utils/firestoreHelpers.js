@@ -303,12 +303,14 @@ export async function updateCustomer(docId, patch) {
 }
 
 // Creates the customer if new, or increments totals if they already exist
-// (matched by phone number). Called from the invoice checkout flow.
+// (matched by phone number). Called from the invoice checkout flow. Returns
+// the customer doc's id — InvoicePage.jsx needs it to sync this customer to
+// Google Contacts against the right doc (see syncGoogleContact below).
 export async function upsertCustomerOnPurchase({ name, phone, email, address }, invoiceAmount, invoiceRef) {
   const q = query(customersCol(), where('phone', '==', phone));
   const snap = await getDocs(q);
   if (snap.empty) {
-    await addDoc(customersCol(), {
+    const ref = await addDoc(customersCol(), {
       name,
       phone,
       email: email || null,
@@ -316,14 +318,15 @@ export async function upsertCustomerOnPurchase({ name, phone, email, address }, 
       totalPurchased: invoiceAmount,
       purchases: [{ date: Date.now(), amount: invoiceAmount, invoiceRef }]
     });
-  } else {
-    const existing = snap.docs[0];
-    const data = existing.data();
-    await updateDoc(doc(db, shopConfig.collections.customers, existing.id), {
-      totalPurchased: (data.totalPurchased || 0) + invoiceAmount,
-      purchases: [...(data.purchases || []), { date: Date.now(), amount: invoiceAmount, invoiceRef }]
-    });
+    return ref.id;
   }
+  const existing = snap.docs[0];
+  const data = existing.data();
+  await updateDoc(doc(db, shopConfig.collections.customers, existing.id), {
+    totalPurchased: (data.totalPurchased || 0) + invoiceAmount,
+    purchases: [...(data.purchases || []), { date: Date.now(), amount: invoiceAmount, invoiceRef }]
+  });
+  return existing.id;
 }
 
 // ---- Invoices -------------------------------------------------------------

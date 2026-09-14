@@ -5,6 +5,7 @@ const crypto = require('crypto');
 const PDFDocument = require('pdfkit');
 const twilio = require('twilio');
 const { drawInvoice } = require('./templates/invoiceTemplate');
+const { GOOGLE_CONTACTS_SECRETS, upsertGoogleContact } = require('./googleContacts');
 
 const REGION = 'asia-south1';
 
@@ -209,4 +210,28 @@ exports.sendWhatsappMarketing = onCall({ secrets: TWILIO_SECRETS }, async (reque
 
   const failed = results.filter((r) => r.status === 'rejected');
   return { sent: results.length - failed.length, failed: failed.length };
+});
+
+// ---- syncGoogleContact -------------------------------------------------------
+// Called from InvoicePage.jsx right after the customer record is upserted in
+// Firestore, so a new/returning customer's name+phone(+email) lands in the
+// shop's actual Google Contacts instantly instead of only ever living in
+// this app's own `customers` collection. See functions/googleContacts.js for
+// the create-vs-update logic and README for the one-time OAuth setup.
+exports.syncGoogleContact = onCall({ secrets: GOOGLE_CONTACTS_SECRETS }, async (request) => {
+  const { customerId, name, phone, email } = request.data || {};
+  if (!customerId || !name || !phone) {
+    throw new HttpsError('invalid-argument', 'customerId, name and phone are required.');
+  }
+
+  const customerRef = admin.firestore().collection('customers').doc(customerId);
+  const snap = await customerRef.get();
+  const existingResourceName = snap.exists ? snap.data().googleContactResourceName || null : null;
+
+  const resourceName = await upsertGoogleContact({ name, phone, email: email || null, existingResourceName });
+  // Recorded so the NEXT sync for this same customer updates this contact in
+  // place instead of creating a duplicate (see googleContacts.js).
+  await customerRef.update({ googleContactResourceName: resourceName });
+
+  return { resourceName };
 });
