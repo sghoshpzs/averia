@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import shopConfig from '../config/shopConfig';
 import { subscribeSales, subscribeInvoices } from '../utils/firestoreHelpers';
-import { calcProfit, formatCurrency, formatDate, sortAsc } from '../utils/calculations';
+import { calcProfit, estimatedCost, formatCurrency, formatDate, sortAsc } from '../utils/calculations';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
 import { emptyDateFilterSelections } from '../utils/dateRanges';
 import { exportRowsToCsv } from '../utils/exportCsv';
@@ -83,7 +83,7 @@ export default function SalesSummaryPage() {
       if (!byGroup[k]) byGroup[k] = { sold: 0, profit: 0, cost: 0 };
       byGroup[k].sold += Number(s.soldPrice) || 0;
       byGroup[k].profit += calcProfit(s.soldPrice, s.cost, s.printedPrice);
-      byGroup[k].cost += Number(s.cost) || 0;
+      byGroup[k].cost += estimatedCost(s.cost, s.printedPrice);
     });
     return Object.entries(byGroup).map(([label, v]) => ({
       label,

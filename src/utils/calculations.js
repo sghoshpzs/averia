@@ -21,12 +21,20 @@ export function calcFinalPrice(printedPrice, discountPercent) {
 // (+ box price) at the default 100% profit margin (see calcPrintedPrice),
 // so half of printed price is used as the best available stand-in — only
 // when cost is genuinely missing, never overriding a real recorded cost.
+// Exported separately (not just inlined in calcProfit) so anything
+// aggregating cost across multiple sales — e.g. Sales Summary's %profit per
+// category — uses the exact same basis profit was computed from. Aggregating
+// real `cost` fields directly instead would silently count every no-cost
+// sale as ₹0 cost while still counting its estimated profit, understating
+// the total cost and inflating profit% wherever the two figures mix.
+export function estimatedCost(cost, printedPrice) {
+  if (cost == null) return (Number(printedPrice) || 0) * 0.5;
+  return Number(cost) || 0;
+}
+
 export function calcProfit(soldPrice, cost, printedPrice) {
   const s = Number(soldPrice) || 0;
-  if (cost == null) {
-    return s - (Number(printedPrice) || 0) * 0.5;
-  }
-  return s - (Number(cost) || 0);
+  return s - estimatedCost(cost, printedPrice);
 }
 
 // 8-digit unique ID derived from the current timestamp (last 8 digits of ms
