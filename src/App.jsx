@@ -4,6 +4,7 @@ import {
   GoogleAuthProvider,
   onAuthStateChanged,
   signInWithRedirect,
+  signInWithPopup,
   getRedirectResult,
   signOut
 } from 'firebase/auth';
@@ -43,6 +44,14 @@ const routeAccess = {
   '/expenses': ['admin']
 };
 
+// True when running as an installed home-screen PWA (Android's manifest
+// "display": "standalone", or iOS's older equivalent) rather than a normal
+// browser tab — see handleGoogleLogin's comment for why that changes which
+// sign-in method is safe to use.
+function isStandaloneDisplayMode() {
+  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
+}
+
 function LoginScreen({ onGoogleLogin, loading, error }) {
   return (
     <div className="auth-shell">
@@ -50,7 +59,7 @@ function LoginScreen({ onGoogleLogin, loading, error }) {
         <div className="auth-brand">Averia Jewellers</div>
         {error && <p className="auth-error">{error}</p>}
         <button type="button" className="auth-button" onClick={onGoogleLogin} disabled={loading}>
-          {loading ? 'Redirecting…' : 'Continue with Google'}
+          {loading ? 'Signing in…' : 'Continue with Google'}
         </button>
       </div>
     </div>
@@ -104,10 +113,25 @@ export default function App() {
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      // Navigates the whole page to Google's sign-in flow, then back to this
-      // app's URL. Nothing to await here for the "success" case — the app
-      // reloads and onAuthStateChanged/getRedirectResult pick it up above.
-      await signInWithRedirect(auth, provider);
+      if (isStandaloneDisplayMode()) {
+        // signInWithRedirect hangs forever on "Loading…" when launched from
+        // an installed home-screen PWA on Android: the round trip to Google
+        // and back can land in a browsing context whose storage isn't the
+        // same one the standalone window persisted its pending sign-in state
+        // to, so getRedirectResult() below never finds anything. A popup
+        // stays in the same window/storage the whole time, so it doesn't
+        // have this problem — use it only in standalone mode, where it's
+        // also not subject to the mobile popup-blocker issues that made
+        // redirect the right choice for normal browser tabs (see below).
+        await signInWithPopup(auth, provider);
+        setLoginLoading(false);
+      } else {
+        // Navigates the whole page to Google's sign-in flow, then back to
+        // this app's URL. Nothing to await here for the "success" case — the
+        // app reloads and onAuthStateChanged/getRedirectResult pick it up
+        // above.
+        await signInWithRedirect(auth, provider);
+      }
     } catch (err) {
       setLoginError(err.message || 'Google login failed. Please try again.');
       setLoginLoading(false);

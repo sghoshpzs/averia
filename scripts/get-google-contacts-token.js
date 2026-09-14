@@ -57,6 +57,16 @@ async function main() {
       const url = new URL(req.url, REDIRECT_URI);
       const authCode = url.searchParams.get('code');
       const error = url.searchParams.get('error');
+      // The browser can hit this port with other requests before the real
+      // OAuth redirect arrives (e.g. an automatic /favicon.ico probe) —
+      // ignore anything that isn't actually the redirect instead of treating
+      // the first request as gospel, or a stray request steals the resolve
+      // with no code and getToken(null) below fails with a confusing error.
+      if (!authCode && !error) {
+        res.writeHead(204);
+        res.end();
+        return;
+      }
       res.end(error ? `Error: ${error}. You can close this tab.` : 'Success — you can close this tab and return to the terminal.');
       server.close();
       if (error) reject(new Error(error));
@@ -64,6 +74,10 @@ async function main() {
     });
     server.listen(PORT);
   });
+
+  if (!code) {
+    throw new Error('No authorization code received from the redirect.');
+  }
 
   const { tokens } = await oauth2Client.getToken(code);
   if (!tokens.refresh_token) {
