@@ -4,7 +4,6 @@ import shopConfig from '../config/shopConfig';
 import { subscribeInventory, updateInventoryDoc, markPrinted, deleteInventoryDocs } from '../utils/firestoreHelpers';
 import { calcPrintedPrice, formatCurrency, formatDate, sortAsc } from '../utils/calculations';
 import { isSuperUser } from '../utils/auth';
-import DateFilter, { useDateFilterState } from '../components/DateFilter';
 import { exportRowsToCsv } from '../utils/exportCsv';
 
 const COLORS = ['#1f5fb5', '#c19a5a', '#1f7a5e', '#8a6fae', '#c92d39', '#3f6b8a'];
@@ -44,7 +43,6 @@ function LinkToggle({ options, value, onChange }) {
 export default function SummaryPage() {
   const [rows, setRows] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('All');
-  const dateFilter = useDateFilterState();
   const [chartGroupBy, setChartGroupBy] = useState('category'); // 'category' | 'vendor'
   const [sideTableGroupBy, setSideTableGroupBy] = useState('type'); // 'type' | 'vendor' (only when a category is selected)
   const [columnFilters, setColumnFilters] = useState({});
@@ -56,19 +54,21 @@ export default function SummaryPage() {
 
   useEffect(() => subscribeInventory(setRows), []);
 
+  // This page is "what's currently on hand", a point-in-time snapshot — not
+  // scoped by purchase date (a Financial Year/Month/Quarter filter here used
+  // to default to the current month and hide everything purchased earlier,
+  // which made real stock disappear for no obvious reason). Sold stock is
+  // always excluded too: sale history/profit already lives on Sales Summary,
+  // this table only ever reflects current holdings.
   const inventoryInScope = useMemo(
-    () => rows.filter((r) => (categoryFilter === 'All' || r.category === categoryFilter) && dateFilter.matches(r.createdAtMillis)),
-    [rows, categoryFilter, dateFilter]
+    () => rows.filter((r) => r.status !== 'Sold' && (categoryFilter === 'All' || r.category === categoryFilter)),
+    [rows, categoryFilter]
   );
 
-  // ---- Summary stats — inventory-derived, scoped by the date filter above;
-  // no profit here (that lives on Sales Summary instead) ----
+  // ---- Summary stats — inventory-derived; no profit/sold-units here (those
+  // live on Sales Summary instead) ----
   const totalInvested = inventoryInScope.reduce((s, r) => s + investedAmount(r), 0);
-  const unitsPurchased = inventoryInScope.reduce((s, r) => s + (Number(r.quantityPurchased) || 1), 0);
-  const unitsSold = inventoryInScope.reduce((s, r) => {
-    if (r.isLot) return s + ((Number(r.quantityPurchased) || 0) - (Number(r.quantityRemaining) || 0));
-    return s + (r.status === 'Sold' ? 1 : 0);
-  }, 0);
+  const unitsAvailable = inventoryInScope.reduce((s, r) => s + (r.isLot ? (Number(r.quantityRemaining) || 0) : 1), 0);
 
   // ---- Chart: Invested amount by Category or by Vendor ----
   const chartData = useMemo(() => {
@@ -247,12 +247,11 @@ export default function SummaryPage() {
         <div>
           <h1 style={{ margin: 0 }}>Inventory Summary</h1>
           <p className="muted" style={{ margin: '8px 0 0', maxWidth: 520 }}>
-            Current stock on hand — what you've invested, how much has sold, and where it's concentrated.
+            Current stock on hand — what's still available, what you've invested in it, and where it's concentrated.
           </p>
         </div>
 
         <div className="filter-bar-row">
-          <DateFilter state={dateFilter} />
           <div className="field category-filter-field">
             <label>Category</label>
             <select value={categoryFilter} onChange={(e) => { setCategoryFilter(e.target.value); setPage(0); }}>
@@ -263,18 +262,14 @@ export default function SummaryPage() {
         </div>
       </div>
 
-      <div className="grid-3">
+      <div className="grid-2">
         <div className="panel summary-stat">
           <div className="value">{formatCurrency(totalInvested)}</div>
           <div className="label">Total Invested</div>
         </div>
         <div className="panel summary-stat">
-          <div className="value">{unitsPurchased}</div>
-          <div className="label">Units Purchased</div>
-        </div>
-        <div className="panel summary-stat">
-          <div className="value">{unitsSold}</div>
-          <div className="label">Units Sold</div>
+          <div className="value">{unitsAvailable}</div>
+          <div className="label">Units Available</div>
         </div>
       </div>
 
