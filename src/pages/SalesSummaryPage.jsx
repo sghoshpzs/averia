@@ -60,7 +60,7 @@ export default function SalesSummaryPage() {
 
   // ---- Top stats ----
   const totalSales = salesInScope.reduce((s, sale) => s + (Number(sale.soldPrice) || 0), 0);
-  const totalProfit = salesInScope.reduce((s, sale) => s + calcProfit(sale.soldPrice, sale.cost), 0);
+  const totalProfit = salesInScope.reduce((s, sale) => s + calcProfit(sale.soldPrice, sale.cost, sale.printedPrice), 0);
   const unitsSold = salesInScope.length;
 
   // ---- Chart: Sold amount by Category or by Vendor ----
@@ -82,7 +82,7 @@ export default function SalesSummaryPage() {
       const k = key(s);
       if (!byGroup[k]) byGroup[k] = { sold: 0, profit: 0, cost: 0 };
       byGroup[k].sold += Number(s.soldPrice) || 0;
-      byGroup[k].profit += calcProfit(s.soldPrice, s.cost);
+      byGroup[k].profit += calcProfit(s.soldPrice, s.cost, s.printedPrice);
       byGroup[k].cost += Number(s.cost) || 0;
     });
     return Object.entries(byGroup).map(([label, v]) => ({
@@ -110,7 +110,7 @@ export default function SalesSummaryPage() {
         const raw = columnFilters[col.key];
         if (!raw) return true;
         let cellValue = s[col.key];
-        if (col.key === 'profit') cellValue = calcProfit(s.soldPrice, s.cost);
+        if (col.key === 'profit') cellValue = calcProfit(s.soldPrice, s.cost, s.printedPrice);
         if (col.key === 'onlinePurchase') cellValue = s.onlinePurchase ? 'Yes' : 'No';
         if (col.filter === 'number') {
           const m = raw.match(/^(gt|lt|eq)?:?\s*(-?\d+(\.\d+)?)$/i);
@@ -151,7 +151,7 @@ export default function SalesSummaryPage() {
       get: (s) => {
         if (col.key === 'invoiceId') return s.invoiceId || s.invoiceRef || '';
         if (col.key === 'onlinePurchase') return s.onlinePurchase ? 'Yes' : 'No';
-        if (col.key === 'profit') return calcProfit(s.soldPrice, s.cost);
+        if (col.key === 'profit') return calcProfit(s.soldPrice, s.cost, s.printedPrice);
         if (col.key === 'soldDate') return formatDate(s.soldDateMillis);
         return s[col.key] ?? '';
       }
@@ -314,7 +314,7 @@ export default function SalesSummaryPage() {
                         </td>
                       );
                     }
-                    if (col.key === 'profit') return <td key={col.key}>{formatCurrency(calcProfit(s.soldPrice, s.cost))}</td>;
+                    if (col.key === 'profit') return <td key={col.key}>{formatCurrency(calcProfit(s.soldPrice, s.cost, s.printedPrice))}</td>;
                     if (col.key === 'soldDate') {
                       return <td key={col.key}>{formatDate(s.soldDateMillis) || '\u2014'}</td>;
                     }

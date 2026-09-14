@@ -13,10 +13,20 @@ export function calcFinalPrice(printedPrice, discountPercent) {
   return pp - pp * (d / 100);
 }
 
-export function calcProfit(soldPrice, cost) {
+// Real cost is unknown for sales with no inventory link (manual/"NA"
+// barcode entries — the item was never in the inventory system, so no cost
+// was ever recorded anywhere for it). Treating that as ₹0 cost would
+// overstate profit to the full sale price, so this falls back to an
+// estimate instead: the shop's own pricing rule is printed price ≈ 2×cost
+// (+ box price) at the default 100% profit margin (see calcPrintedPrice),
+// so half of printed price is used as the best available stand-in — only
+// when cost is genuinely missing, never overriding a real recorded cost.
+export function calcProfit(soldPrice, cost, printedPrice) {
   const s = Number(soldPrice) || 0;
-  const c = Number(cost) || 0;
-  return s - c;
+  if (cost == null) {
+    return s - (Number(printedPrice) || 0) * 0.5;
+  }
+  return s - (Number(cost) || 0);
 }
 
 // 8-digit unique ID derived from the current timestamp (last 8 digits of ms
