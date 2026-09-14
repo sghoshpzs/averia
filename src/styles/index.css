@@ -397,7 +397,13 @@ table.data-table.excel-table tbody tr.row-sold:hover td {
   .menu-toggle { display: flex; }
   .app-nav-mobile { display: flex; }
   .app-main { padding: 16px; }
-  .app-header-row { padding: 14px 16px; flex-wrap: wrap; }
+  /* Keep brand + the avatar/hamburger icons on one line — brand shrinks and
+     truncates instead of the row wrapping, which used to push the icons
+     down to a second line whenever the shop name didn't fit. */
+  .app-header-row { padding: 14px 16px; flex-wrap: nowrap; }
+  .brand { min-width: 0; flex: 1 1 auto; }
+  .brand .shop-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .header-actions { flex: 0 0 auto; }
   .brand img.logo { height: 40px; }
   .brand .shop-name { font-size: 44px; }
   .line-item-row { grid-template-columns: 1fr 1fr; }
