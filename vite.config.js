@@ -50,7 +50,18 @@ export default defineConfig({
         // 1.8MB it would roughly double the precache size for no benefit.
         // The small pwa-*/maskable icons used for the installed app icon are
         // still precached normally.
-        globIgnores: ['logo.png']
+        globIgnores: ['logo.png'],
+        // /__/* is Firebase's own reserved path space (auth handler, hosting
+        // internals) — it lives on the SAME origin as this app's authDomain
+        // (averia-jewelry.firebaseapp.com also serves this exact SPA, so a
+        // service worker ends up registered there too). Without this
+        // denylist, the SW's SPA fallback hijacks navigations to
+        // /__/auth/handler and serves our own cached index.html instead of
+        // letting Firebase's real handler page run — which is what actually
+        // completes a Google sign-in redirect/popup and relays the result
+        // back. That hijack was the true cause of sign-in hanging on
+        // "Loading…" no matter which sign-in method was used.
+        navigateFallbackDenylist: [/^\/__\//]
       }
     })
   ],
