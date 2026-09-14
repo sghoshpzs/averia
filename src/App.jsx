@@ -42,14 +42,6 @@ const routeAccess = {
   '/expenses': ['admin']
 };
 
-// True when running as an installed home-screen PWA (Android's manifest
-// "display": "standalone", or iOS's older equivalent) rather than a normal
-// browser tab — see handleGoogleLogin's comment for why that changes which
-// sign-in method is safe to use.
-function isStandaloneDisplayMode() {
-  return window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
-}
-
 function LoginScreen({ onGoogleLogin, loading, error }) {
   return (
     <div className="auth-shell">
@@ -86,17 +78,6 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
 
-  // Picks up the result of a signInWithRedirect once the browser navigates
-  // back from Google. Runs once on mount, before/alongside onAuthStateChanged.
-  // This is also where redirect-specific errors surface (popup errors used to
-  // reject the signInWithPopup promise directly; redirect errors only show up
-  // here, after the round trip completes).
-  useEffect(() => {
-    getRedirectResult(auth).catch((err) => {
-      setLoginError(err.message || 'Google login failed. Please try again.');
-    });
-  }, []);
-
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
@@ -105,33 +86,29 @@ export default function App() {
     return unsubscribe;
   }, []);
 
+  // signInWithRedirect (tried before this) hangs forever on "Loading…" for
+  // some mobile/installed-PWA contexts — the round trip to Google and back
+  // can land in a browsing context whose storage isn't the one the original
+  // window persisted its pending sign-in state to, so getRedirectResult()
+  // never finds anything, with no error and no way to recover short of
+  // closing the app. Trying to detect exactly which contexts are affected
+  // (e.g. via display-mode: standalone) turned out to be unreliable — an
+  // actual installed home-screen shortcut didn't report as standalone here.
+  // signInWithPopup avoids the whole class of problem (same window/storage
+  // throughout) and, called from a real button click as it is here, isn't
+  // subject to popup-blocker issues either — and if it ever does fail, it
+  // fails with a catchable error the user can see and retry, instead of an
+  // unrecoverable silent hang.
   async function handleGoogleLogin() {
     setLoginLoading(true);
     setLoginError('');
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      if (isStandaloneDisplayMode()) {
-        // signInWithRedirect hangs forever on "Loading…" when launched from
-        // an installed home-screen PWA on Android: the round trip to Google
-        // and back can land in a browsing context whose storage isn't the
-        // same one the standalone window persisted its pending sign-in state
-        // to, so getRedirectResult() below never finds anything. A popup
-        // stays in the same window/storage the whole time, so it doesn't
-        // have this problem — use it only in standalone mode, where it's
-        // also not subject to the mobile popup-blocker issues that made
-        // redirect the right choice for normal browser tabs (see below).
-        await signInWithPopup(auth, provider);
-        setLoginLoading(false);
-      } else {
-        // Navigates the whole page to Google's sign-in flow, then back to
-        // this app's URL. Nothing to await here for the "success" case — the
-        // app reloads and onAuthStateChanged/getRedirectResult pick it up
-        // above.
-        await signInWithRedirect(auth, provider);
-      }
+      await signInWithPopup(auth, provider);
     } catch (err) {
       setLoginError(err.message || 'Google login failed. Please try again.');
+    } finally {
       setLoginLoading(false);
     }
   }
