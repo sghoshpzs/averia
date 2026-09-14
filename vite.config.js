@@ -6,7 +6,17 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
+      // 'autoUpdate' reloads the page the instant it detects a newer deployed
+      // version, with no regard for what the user is doing at that moment —
+      // this was silently wiping in-progress Google sign-in (and could just
+      // as easily interrupt a checkout) whenever a deploy happened while
+      // someone had the app open. 'prompt' installs the new version in the
+      // background and lets it activate naturally next time every tab for
+      // this site is closed, instead of forcing a reload mid-session. No
+      // "update available" UI is wired up for it (not worth the complexity
+      // for this app) — the existing "fully close and reopen" habit already
+      // picks up new deploys.
+      registerType: 'prompt',
       includeAssets: ['logo.svg', 'apple-touch-icon.png'],
       manifest: {
         name: 'Averia Jewellery',
