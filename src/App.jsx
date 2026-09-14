@@ -3,7 +3,8 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
-  signInWithPopup,
+  signInWithRedirect,
+  getRedirectResult,
   signOut
 } from 'firebase/auth';
 import { auth } from './firebase';
@@ -49,7 +50,7 @@ function LoginScreen({ onGoogleLogin, loading, error }) {
         <div className="auth-brand">Averia Jewellers</div>
         {error && <p className="auth-error">{error}</p>}
         <button type="button" className="auth-button" onClick={onGoogleLogin} disabled={loading}>
-          {loading ? 'Signing in…' : 'Continue with Google'}
+          {loading ? 'Redirecting…' : 'Continue with Google'}
         </button>
       </div>
     </div>
@@ -78,6 +79,22 @@ export default function App() {
   const [loginLoading, setLoginLoading] = useState(false);
   const [loginError, setLoginError] = useState('');
 
+  // Picks up the result of signInWithRedirect once the browser navigates
+  // back from Google. Runs once on mount, before/alongside onAuthStateChanged.
+  // Popup-based sign-in was tried in between (avoids the full-page round
+  // trip entirely) but ran into its own problems with the cross-window
+  // messaging it depends on — redirect's only requirement is that Firebase's
+  // pending-sign-in state survives in IndexedDB across the trip to Google and
+  // back, which is a simpler, more robust mechanism for a plain same-window
+  // flow. (The earlier "stuck on Loading" issue with redirect turned out to
+  // be the PWA's service worker force-reloading mid-flow on every deploy —
+  // now fixed by switching off auto-reload, see vite.config.js.)
+  useEffect(() => {
+    getRedirectResult(auth).catch((err) => {
+      setLoginError(err.message || 'Google login failed. Please try again.');
+    });
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
@@ -86,29 +103,18 @@ export default function App() {
     return unsubscribe;
   }, []);
 
-  // signInWithRedirect (tried before this) hangs forever on "Loading…" for
-  // some mobile/installed-PWA contexts — the round trip to Google and back
-  // can land in a browsing context whose storage isn't the one the original
-  // window persisted its pending sign-in state to, so getRedirectResult()
-  // never finds anything, with no error and no way to recover short of
-  // closing the app. Trying to detect exactly which contexts are affected
-  // (e.g. via display-mode: standalone) turned out to be unreliable — an
-  // actual installed home-screen shortcut didn't report as standalone here.
-  // signInWithPopup avoids the whole class of problem (same window/storage
-  // throughout) and, called from a real button click as it is here, isn't
-  // subject to popup-blocker issues either — and if it ever does fail, it
-  // fails with a catchable error the user can see and retry, instead of an
-  // unrecoverable silent hang.
   async function handleGoogleLogin() {
     setLoginLoading(true);
     setLoginError('');
     try {
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
-      await signInWithPopup(auth, provider);
+      // Navigates the whole page to Google's sign-in flow, then back to this
+      // app's URL. Nothing to await here for the "success" case — the app
+      // reloads and onAuthStateChanged/getRedirectResult pick it up above.
+      await signInWithRedirect(auth, provider);
     } catch (err) {
       setLoginError(err.message || 'Google login failed. Please try again.');
-    } finally {
       setLoginLoading(false);
     }
   }
