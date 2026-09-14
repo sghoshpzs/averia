@@ -3,9 +3,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import {
   GoogleAuthProvider,
   onAuthStateChanged,
-  signInWithRedirect,
   signInWithPopup,
-  getRedirectResult,
   signOut
 } from 'firebase/auth';
 import { auth } from './firebase';
