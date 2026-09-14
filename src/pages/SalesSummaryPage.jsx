@@ -4,6 +4,7 @@ import shopConfig from '../config/shopConfig';
 import { subscribeSales, subscribeInvoices } from '../utils/firestoreHelpers';
 import { calcProfit, formatCurrency, formatDate, sortAsc } from '../utils/calculations';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
+import { emptyDateFilterSelections } from '../utils/dateRanges';
 import { exportRowsToCsv } from '../utils/exportCsv';
 
 const COLORS = ['#1f5fb5', '#c19a5a', '#1f7a5e', '#8a6fae', '#c92d39', '#3f6b8a'];
@@ -31,7 +32,10 @@ export default function SalesSummaryPage() {
   const [sales, setSales] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [categoryFilter, setCategoryFilter] = useState('All');
-  const dateFilter = useDateFilterState();
+  // Opens showing every sale, not just the current month — the filter
+  // controls are still here to narrow down to a specific FY/month/quarter,
+  // but defaulting to "current month only" made past sales look missing.
+  const dateFilter = useDateFilterState(emptyDateFilterSelections);
   const [chartGroupBy, setChartGroupBy] = useState('category'); // 'category' | 'vendor'
   const [sideTableGroupBy, setSideTableGroupBy] = useState('type'); // 'type' | 'vendor'
   const [columnFilters, setColumnFilters] = useState({});

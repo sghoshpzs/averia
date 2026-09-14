@@ -52,6 +52,15 @@ export function defaultDateFilterSelections() {
   };
 }
 
+// An emptied-out selection on every dimension means "no restriction" per
+// matchesDateFilter below — used where a page wants the filter controls
+// available but shouldn't hide anything until the user actually narrows it
+// down (e.g. Sales Summary: defaulting to "current month only" silently hid
+// every prior month's sales, which looked like missing/broken data).
+export function emptyDateFilterSelections() {
+  return { fys: new Set(), months: new Set(), quarters: new Set() };
+}
+
 // Each dimension only restricts the match when it has at least one value
 // selected — an emptied-out selection means "no restriction" on that
 // dimension rather than "matches nothing".

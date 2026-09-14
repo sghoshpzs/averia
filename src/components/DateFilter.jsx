@@ -6,11 +6,13 @@ import {
 } from '../utils/dateRanges';
 
 // Shared "Financial Year / Month / Quarter" top-level date filter used by
-// Inventory Summary, Sales Summary, and Ad-Hoc Expenses. Each dimension is
-// multi-select and defaults to the current period; combining dimensions is
-// an AND (a row must match a selected value in every dimension that has one).
-export function useDateFilterState() {
-  const [selections, setSelections] = useState(defaultDateFilterSelections);
+// Sales Summary and Ad-Hoc Expenses. Each dimension is multi-select;
+// combining dimensions is an AND (a row must match a selected value in every
+// dimension that has one). Defaults to the current period unless a page
+// passes its own initial selections (e.g. emptyDateFilterSelections, to open
+// showing everything while still letting the user narrow it down).
+export function useDateFilterState(initialSelections = defaultDateFilterSelections) {
+  const [selections, setSelections] = useState(initialSelections);
 
   const setFys = useCallback((fys) => setSelections((s) => ({ ...s, fys })), []);
   const setMonths = useCallback((months) => setSelections((s) => ({ ...s, months })), []);
