@@ -258,7 +258,15 @@ export default function InvoicePage() {
           quantity: i.quantity,
           soldPricePerUnit: Number(i.finalPrice),
           printedPrice: i.printedPrice,
-          discountPercent: i.discountPercent
+          discountPercent: i.discountPercent,
+          // Only actually used for manual/lookup-failed lines (no
+          // inventoryDoc) — checkoutInvoice needs these to still write a
+          // sales record for them, since there's no inventory doc to read
+          // category/type/name back off of.
+          category: i.category,
+          type: i.type,
+          name: i.name,
+          barcode: i.barcode
         })),
         {
           items: invoiceItems,

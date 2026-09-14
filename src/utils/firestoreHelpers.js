@@ -134,12 +134,18 @@ export function reserveInvoiceId() {
   return generateRowId();
 }
 
-// cartItems: [{ inventoryDoc, quantity, soldPricePerUnit }] — entries
-// without an inventoryDoc (manual/lookup-failed lines) are skipped for the
-// inventory/sales writes but still appear in the invoice's item list.
+// cartItems: [{ inventoryDoc, quantity, soldPricePerUnit, category, type,
+// name, barcode }] — entries without an inventoryDoc (manual/lookup-failed
+// lines, barcode "NA") skip the inventory read/decrement (there's no doc to
+// decrement) but still get a `sales` doc each, using the category/type/name
+// typed in by hand and cost left null (genuinely unknown for these). Without
+// this, a shop that regularly checks out un-barcoded items would see those
+// sales nowhere but the invoice PDF — never in Sales Summary, never counted
+// toward inventory-derived stats.
 export async function checkoutInvoice(cartItems, invoiceData, invoiceId) {
   const invoiceRef = invoiceId ? doc(db, shopConfig.collections.invoices, invoiceId) : doc(invoicesCol());
   const itemsWithInventory = cartItems.filter((i) => i.inventoryDoc);
+  const manualItems = cartItems.filter((i) => !i.inventoryDoc);
 
   await runTransaction(db, async (tx) => {
     // ---- READ PHASE — every tx.get() must happen before any tx.set/update ----
@@ -246,6 +252,45 @@ export async function checkoutInvoice(cartItems, invoiceData, invoiceId) {
           name: data.name,
           cost: data.cost,
           soldPrice: soldPricePerUnit,
+          soldDate: serverTimestamp(),
+          soldDateMillis: Date.now(),
+          invoiceRef: invoiceRef.id,
+          ...saleExtras
+        });
+      }
+    });
+
+    // Manual/lookup-failed items (barcode "NA") — no inventory doc to read,
+    // validate stock against, or decrement, so this skips straight to
+    // writing one sales doc per unit, same granularity as the lot branch
+    // above. cost is unknown for these (never entered anywhere for a line
+    // that was never in the inventory system), so profit on Sales Summary
+    // reads as the full sale price for them — the best available answer
+    // given there's genuinely no cost to subtract.
+    manualItems.forEach((item) => {
+      const qty = Math.max(1, Number(item.quantity) || 1);
+      const saleExtras = {
+        vendor: null,
+        printedPrice: item.printedPrice ?? null,
+        discountPercent: item.discountPercent ?? 0,
+        quantity: 1,
+        invoiceId: invoiceRef.id,
+        customerName: invoiceData.customerName || null,
+        customerPhone: invoiceData.customerPhone || null,
+        customerEmail: invoiceData.customerEmail || null,
+        onlinePurchase: Boolean(invoiceData.onlinePurchase),
+        paymentMode: invoiceData.paymentMode || null
+      };
+      for (let i = 0; i < qty; i++) {
+        const saleRef = doc(salesCol());
+        tx.set(saleRef, {
+          inventoryDocId: null,
+          rowId: item.barcode || null,
+          category: item.category || null,
+          type: item.type || null,
+          name: item.name || null,
+          cost: null,
+          soldPrice: item.soldPricePerUnit,
           soldDate: serverTimestamp(),
           soldDateMillis: Date.now(),
           invoiceRef: invoiceRef.id,
