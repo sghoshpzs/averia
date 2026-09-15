@@ -202,7 +202,7 @@ Required repo secrets (Settings → Secrets and variables → Actions):
 | Secret | Used for |
 | --- | --- |
 | `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_AUTH_DOMAIN`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_STORAGE_BUCKET`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_APP_ID` | Baked into the hosting build (same values as `.env`) |
-| `VITE_ALLOWED_ADMINS`, `VITE_ALLOWED_WORKERS` | Baked into the hosting build (same as `.env`) |
+| `VITE_ALLOWED_ADMINS`, `VITE_ALLOWED_WORKERS`, `VITE_SUPER_USER` | Baked into the hosting build (same as `.env`) — missing `VITE_SUPER_USER` silently disables the Delete button on Inventory Summary/Ad-Hoc Expenses for everyone, with no visible error |
 | `FIREBASE_SERVICE_ACCOUNT_AVERIA_JEWELRY` | Hosting deploy credential |
 | `FIREBASE_FUNCTIONS_DEPLOY_KEY` | Full JSON of a service account key, reused for both Cloud Functions deploys and the `deploy_rules` job — see the IAM notes above: needs `roles/iam.serviceAccountUser` on the compute service account, and `roles/firebasestorage.admin` at the project level |
 | `SHOP_NAME`, `SHOP_ADDRESS`, `SHOP_PHONE`, `SHOP_EMAIL` | Written into `functions/.env` at deploy time (see `functions/.env.example`) |

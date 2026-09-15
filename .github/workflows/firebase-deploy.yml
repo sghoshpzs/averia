@@ -57,6 +57,7 @@ jobs:
           VITE_FIREBASE_APP_ID: ${{ secrets.VITE_FIREBASE_APP_ID }}
           VITE_ALLOWED_ADMINS: ${{ secrets.VITE_ALLOWED_ADMINS }}
           VITE_ALLOWED_WORKERS: ${{ secrets.VITE_ALLOWED_WORKERS }}
+          VITE_SUPER_USER: ${{ secrets.VITE_SUPER_USER }}
       - uses: FirebaseExtended/action-hosting-deploy@v0
         with:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
