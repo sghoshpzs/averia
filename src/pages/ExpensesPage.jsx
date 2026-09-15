@@ -4,6 +4,7 @@ import { subscribeExpenses, addExpense, deleteExpenses } from '../utils/firestor
 import { formatCurrency, formatDate, sortAsc } from '../utils/calculations';
 import { isSuperUser } from '../utils/auth';
 import DateFilter, { useDateFilterState } from '../components/DateFilter';
+import { emptyDateFilterSelections } from '../utils/dateRanges';
 import { exportRowsToCsv } from '../utils/exportCsv';
 
 function todayInputValue() {
@@ -23,7 +24,11 @@ export default function ExpensesPage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState(null);
   const [categoryFilter, setCategoryFilter] = useState('All');
-  const dateFilter = useDateFilterState();
+  // Opens showing every expense, not just the current month — the filter
+  // controls are still here to narrow down to a specific FY/month/quarter,
+  // but defaulting to "current month only" made past expenses look missing
+  // (same issue fixed on Sales Summary).
+  const dateFilter = useDateFilterState(emptyDateFilterSelections);
   const [selectedIds, setSelectedIds] = useState(new Set());
   const [deleting, setDeleting] = useState(false);
   const canDelete = isSuperUser();
