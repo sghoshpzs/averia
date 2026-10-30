@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import shopConfig, { resolveDefault } from '../config/shopConfig';
+import shopConfig, { resolveDefault, defaultBoxPrice } from '../config/shopConfig';
 import ConfigField from '../components/ConfigField';
 import { calcPrintedPrice, generateRowId, generateSku } from '../utils/calculations';
 import { addInventoryRows, addInventoryLot } from '../utils/firestoreHelpers';
@@ -40,8 +40,12 @@ export default function InventoryPage() {
   function handleChange(key, val) {
     setValues((prev) => {
       const next = { ...prev, [key]: val };
-      // reset type when category changes, since options depend on it
-      if (key === 'category') next.type = '';
+      // reset type when category changes, since options depend on it, and
+      // re-default Box Price for the new category (70 for Necklace, else 0)
+      if (key === 'category') {
+        next.type = '';
+        next.boxPrice = defaultBoxPrice(val);
+      }
       return next;
     });
   }

@@ -83,8 +83,14 @@ const shopConfig = {
   // ---- Defaults -----------------------------------------------------------
   defaults: {
     profitPercent: 100,
-    boxPrice: 70.0,
+    boxPrice: 0,
     itemCount: 1
+  },
+
+  // Box Price pre-filled when one of these categories is picked on the
+  // Inventory form; any other category falls back to defaults.boxPrice.
+  boxPriceByCategory: {
+    Necklace: 70.0
   },
 
   // ---- Inventory form field definitions ------------------------------------
@@ -189,6 +195,10 @@ export function resolveDropdownSource(field, formValues) {
     return shopConfig.types[category] || shopConfig.types._default;
   }
   return shopConfig[field.source] || [];
+}
+
+export function defaultBoxPrice(category) {
+  return shopConfig.boxPriceByCategory[category] ?? shopConfig.defaults.boxPrice;
 }
 
 export function isLotTracked(category) {
