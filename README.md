@@ -174,18 +174,18 @@ The Cloud Functions here (`generateInvoicePdfAndSend`, `viewInvoicePdf`, `sendWh
 
 ### Storage rules deploy — one-time IAM setup
 
-`firebase deploy --only storage` (deployed by CI's `deploy_rules` job on every push, and by the manual command in [Deploy](#deploy) above) needs to resolve the project's default Storage bucket first, which requires the `firebasestorage.defaultBucket.get` permission. The CI deploy identity (`firebase-adminsdk-fbsvc@averia-jewelry.iam.gserviceaccount.com` — the account behind the `FIREBASE_FUNCTIONS_DEPLOY_KEY` secret) doesn't have it by default, so this step fails with:
+`firebase deploy --only storage` (deployed by CI's `deploy_rules` job on every push, and by the manual command in [Deploy](#deploy) above) needs to resolve the project's default Storage bucket first, which requires the `firebasestorage.defaultBucket.get` permission. The CI deploy identity (`firebase-adminsdk-fbsvc@averia-jewellery.iam.gserviceaccount.com` — the account behind the `FIREBASE_FUNCTIONS_DEPLOY_KEY` secret) doesn't have it by default, so this step fails with:
 
 ```
-Error: Request to https://firebasestorage.googleapis.com/v1alpha/projects/averia-jewelry/defaultBucket had HTTP Error: 403,
-Permission 'firebasestorage.defaultBucket.get' denied on resource '//firebasestorage.googleapis.com/projects/averia-jewelry/defaultBucket'
+Error: Request to https://firebasestorage.googleapis.com/v1alpha/projects/averia-jewellery/defaultBucket had HTTP Error: 403,
+Permission 'firebasestorage.defaultBucket.get' denied on resource '//firebasestorage.googleapis.com/projects/averia-jewellery/defaultBucket'
 ```
 
 One-time grant to fix it:
 
 1. Google Cloud Console → **IAM & Admin → IAM** (the project-level page this time, not a single service account's Permissions tab).
 2. **Grant Access**.
-3. New principal: `firebase-adminsdk-fbsvc@averia-jewelry.iam.gserviceaccount.com` (or whichever account's key is in `FIREBASE_FUNCTIONS_DEPLOY_KEY`/used for local manual deploys).
+3. New principal: `firebase-adminsdk-fbsvc@averia-jewellery.iam.gserviceaccount.com` (or whichever account's key is in `FIREBASE_FUNCTIONS_DEPLOY_KEY`/used for local manual deploys).
 4. Role: **Firebase Storage Admin** (`roles/firebasestorage.admin`).
 5. Save, then re-run the deploy/workflow.
 

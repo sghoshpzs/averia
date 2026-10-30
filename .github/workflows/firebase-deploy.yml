@@ -63,7 +63,7 @@ jobs:
           repoToken: ${{ secrets.GITHUB_TOKEN }}
           firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_AVERIA_JEWELRY }}
           channelId: live
-          projectId: averia-jewelry
+          projectId: averia-jewellery
 
   # Firestore/Storage rules were previously never redeployed by CI (only
   # hosting and functions were) — the checked-in firestore.rules/storage.rules
@@ -80,7 +80,7 @@ jobs:
         run: |
           echo '${{ secrets.FIREBASE_FUNCTIONS_DEPLOY_KEY }}' > "$RUNNER_TEMP/service-account.json"
       - name: Deploy Firestore and Storage rules
-        run: npx firebase-tools deploy --only firestore:rules,storage --project averia-jewelry --non-interactive
+        run: npx firebase-tools deploy --only firestore:rules,storage --project averia-jewellery --non-interactive
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/service-account.json
 
@@ -119,6 +119,6 @@ jobs:
           cp "$RUNNER_TEMP/service-account.json" "$HOME/.config/gcloud/application_default_credentials.json"
 
       - name: Deploy functions
-        run: npx firebase-tools deploy --only functions --project averia-jewelry --non-interactive
+        run: npx firebase-tools deploy --only functions --project averia-jewellery --non-interactive
         env:
           GOOGLE_APPLICATION_CREDENTIALS: ${{ runner.temp }}/service-account.json

@@ -53,7 +53,7 @@ export default defineConfig({
         globIgnores: ['logo.png'],
         // /__/* is Firebase's own reserved path space (auth handler, hosting
         // internals) — it lives on the SAME origin as this app's authDomain
-        // (averia-jewelry.firebaseapp.com also serves this exact SPA, so a
+        // (averia-jewellery.firebaseapp.com also serves this exact SPA, so a
         // service worker ends up registered there too). Without this
         // denylist, the SW's SPA fallback hijacks navigations to
         // /__/auth/handler and serves our own cached index.html instead of
