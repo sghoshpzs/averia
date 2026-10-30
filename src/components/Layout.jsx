@@ -5,8 +5,6 @@ import { auth } from '../firebase';
 import shopConfig from '../config/shopConfig';
 
 const navItems = [
-  { to: '/inventory', label: 'Inventory' },
-  { to: '/invoice', label: 'Invoice' },
   {
     label: 'Summary',
     children: [
@@ -14,8 +12,10 @@ const navItems = [
       { to: '/sales-summary', label: 'Sales Summary' }
     ]
   },
+  { to: '/customers', label: 'Customers' },
+  { to: '/inventory', label: 'Inventory' },
   { to: '/expenses', label: 'Ad-Hoc Expenses' },
-  { to: '/customers', label: 'Customers' }
+  { to: '/invoice', label: 'Invoice' }
 ];
 
 // Desktop-only dropdown for a nav item with children (e.g. "Summary").

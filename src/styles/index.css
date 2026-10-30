@@ -87,7 +87,9 @@ a.link-toggle + a.link-toggle { margin-left: 14px; }
 .brand .shop-name { font-family: var(--font-brand); font-size: 68px; line-height: 0.9; letter-spacing: 0.02em; color: var(--accent-dark); font-weight: 700; }
 
 .app-nav { display: flex; gap: 20px; }
-.app-nav-desktop { margin-left: 48px; }
+/* margin-left: auto pushes the nav right, next to the avatar, instead of
+   leaving it stranded mid-header by the row's space-between. */
+.app-nav-desktop { margin-left: auto; margin-right: 28px; padding-left: 48px; }
 .app-nav a {
   text-decoration: none; color: var(--ink-muted); font-size: 20px; font-weight: 600;
   padding: 12px 0; transition: color .15s ease, border-color .15s ease;

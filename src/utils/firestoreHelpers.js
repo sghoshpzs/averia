@@ -14,7 +14,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import shopConfig from '../config/shopConfig';
-import { generateRowId } from './calculations';
+import { generateRowId, generateSku } from './calculations';
 
 const inventoryCol = () => collection(db, shopConfig.collections.inventory);
 const customersCol = () => collection(db, shopConfig.collections.customers);
@@ -260,6 +260,46 @@ export async function checkoutInvoice(cartItems, invoiceData, invoiceId) {
       }
     });
 
+    // A real (numeric) barcode that wasn't found in inventory still gets an
+    // inventory row, created here already marked Sold, so the piece shows
+    // up on Inventory Summary like anything entered through Inventory.
+    // "NA" lines are left out — there's no barcode to file them under.
+    // Lines sharing one unknown barcode share one row: a lot row (with
+    // nothing remaining) when more than one unit was sold, else a plain row.
+    const createdInvIdByBarcode = new Map();
+    const qtyByUnknownBarcode = new Map();
+    manualItems.forEach((item) => {
+      const barcode = String(item.barcode || '').trim();
+      if (!barcode || barcode.toUpperCase() === 'NA') return;
+      const qty = Math.max(1, Number(item.quantity) || 1);
+      qtyByUnknownBarcode.set(barcode, (qtyByUnknownBarcode.get(barcode) || 0) + qty);
+    });
+    qtyByUnknownBarcode.forEach((totalQty, barcode) => {
+      const item = manualItems.find((i) => String(i.barcode || '').trim() === barcode);
+      const invRef = doc(inventoryCol());
+      const nowMillis = Date.now();
+      tx.set(invRef, {
+        category: item.category || null,
+        type: item.type || null,
+        name: item.name || null,
+        vendor: null,
+        cost: null,
+        printedPrice: Number(item.printedPrice) || 0,
+        rowId: barcode,
+        sku: generateSku(barcode),
+        ...(totalQty > 1 ? { isLot: true, quantityPurchased: totalQty, quantityRemaining: 0 } : {}),
+        status: 'Sold',
+        created: serverTimestamp(),
+        createdAtMillis: nowMillis,
+        soldPrice: totalQty > 1 ? null : item.soldPricePerUnit,
+        soldDate: totalQty > 1 ? null : serverTimestamp(),
+        soldDateMillis: totalQty > 1 ? null : nowMillis,
+        createdAtCheckout: true,
+        invoiceId: invoiceRef.id
+      });
+      createdInvIdByBarcode.set(barcode, invRef.id);
+    });
+
     // Manual/lookup-failed items (barcode "NA") — no inventory doc to read,
     // validate stock against, or decrement, so this skips straight to
     // writing one sales doc per unit, same granularity as the lot branch
@@ -284,7 +324,7 @@ export async function checkoutInvoice(cartItems, invoiceData, invoiceId) {
       for (let i = 0; i < qty; i++) {
         const saleRef = doc(salesCol());
         tx.set(saleRef, {
-          inventoryDocId: null,
+          inventoryDocId: createdInvIdByBarcode.get(String(item.barcode || '').trim()) || null,
           rowId: item.barcode || null,
           category: item.category || null,
           type: item.type || null,

@@ -446,7 +446,13 @@ export default function InvoicePage() {
             />
           </div>
           <div className="field">
-            <label>Printed Price {draft.lookupFailed && <span style={{ color: '#b3372c' }}>(not found — enter manually)</span>}</label>
+            <label>
+              Printed Price {draft.lookupFailed && (
+                <span style={{ color: '#b3372c' }}>
+                  {draft.barcode === 'NA' ? '(enter manually)' : '(not in inventory — enter manually; added to inventory as Sold at checkout)'}
+                </span>
+              )}
+            </label>
             <input
               type="number"
               value={draft.printedPrice}
